@@ -10,7 +10,7 @@
 #    Continuing the maze example,
 #    going left may be ideal at a certain fork in the path, but not at others.
 
-#     Loss = -log(π)*A
+#     Loss = -log(PAI)*A
 
 #    A is advantage,
 #    and is an essential aspect of all reinforcement learning algorithms.
@@ -20,7 +20,8 @@
 #    but for now we will assume that the baseline is 0,
 #    and it can be thought of as simply the reward we received for each action.
 
-#    π is the policy. In this case, it corresponds to the chosen action’s weight.
+
+# this is simulation 4 slotmachine generating different probabilities....
 
 
 import tensorflow as tf
