@@ -1,4 +1,6 @@
 #
+
+
 import gym
 import numpy as np
 import random
@@ -8,8 +10,6 @@ import matplotlib.pyplot as plt
 env = gym.make('FrozenLake-v0')
 
 tf.reset_default_graph()
-
-
 
 #These lines establish the feed-forward part of the network used to choose actions
 inputs1 = tf.placeholder(shape=[1,16],dtype=tf.float32)
