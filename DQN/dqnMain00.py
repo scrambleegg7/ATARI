@@ -109,7 +109,9 @@ def training(render = False):
                     action = env.action_space.sample()
                 else:
                     # Get action from Q-network
-                    feed = {mainQN.inputs_: state.reshape((1, *state.shape))}
+                    #feed = {mainQN.inputs_: state.reshape((1, *state.shape))}
+
+                    feed = {mainQN.inputs_: state.reshape((1, state.shape[0] ))}
                     Qs = sess.run(mainQN.output, feed_dict=feed)
                     action = np.argmax(Qs)
 
