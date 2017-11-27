@@ -63,15 +63,20 @@ def BasicScenario():
 
 def train():
 
-    current_status_image = initial_action()
+
     #print(x_image.shape)
     #plt.imshow(x_image)
     #plt.show()
 
     myAgent = AgentClass(2)
 
+    # initialize Q Network
     y_q , var_q = myAgent.build_network()
+
+    # intialize Target Network
     y_target , var_target = myAgent.build_target()
+
+    # get traing loss
     a, y, loss, grad_update = myAgent.build_training_op(y_q, var_q)
 
     epsilon = 1.0
@@ -85,15 +90,21 @@ def train():
         sess.run(init_op)
         saver = tf.train.Saver()
 
-        for i_frames in range(100000): # num of frames
-            if i_frames % 1000 == 999:
-                print("Excecute looping ", i_frames)
+        episodes = 10
+
+        for i_frames in range(episodes): # num of frames
+
+            # initial screen
+            init_state = initial_action()
 
             if epsilon >= np.random.random():
-                action = np.random.choice(2,1)
+                action = env.action_space.sample()
+                #action = np.random.choice(2,1)
+                print("from random:", action)
             else:
                 a = y_q.eval(feed_dict = {x:init_state})
                 action = np.argmax(a)
+                print("from model:",action)
             repeated_action = action
 
             if epsilon > FINAL_EPS:
