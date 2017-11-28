@@ -24,16 +24,21 @@ class AgentClass(object):
         self.time_step = 0
         self.repeated_action = 0
 
+        self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
+        print("** AgentClass x: ",self.x.get_shape().as_list())
+
         self.y_q_values , var_q = self.build_network()
         # intialize Target Network
         y_target , var_target = self.build_target()
         # get traing loss
         a, y, loss, grad_update = self.build_training_op(self.y_q_values, var_q)
 
-        self.copyTargetQNetworkOperation = [var_target[i].assign(var_q[i]) for i in xrange(len(var_target))]
+        self.copyTargetQNetworkOperation = [var_target[i].assign(var_q[i]) for i in range(len(var_target))]
 
         #
         self.replay_memory = deque()
+
+
 
         self.sess = tf.Session()
         print("check var of q_network and target_network...")
@@ -41,6 +46,7 @@ class AgentClass(object):
                        tf.local_variables_initializer())
         self.sess.run(init_op)
         saver = tf.train.Saver()
+
 
     def epsilon_update(self):
         if self.epsilon > FINAL_EPSILON:
@@ -68,14 +74,13 @@ class AgentClass(object):
 
         with tf.variable_scope(main_name) as scope:
 
-            self.x = tf.placeholder( tf.float32, [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
-            x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
+            #x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
 
             name = "conv1"
             with tf.variable_scope(name) as scope:
                 W_conv1 = self.weight_variable([8, 8, STATE_LENGTH, 32],reuse)
                 b_conv1 = self.bias_variable([32],reuse)
-                conv1 = tf.nn.relu(self.conv2d(x_image, W_conv1,[1,4,4,1] ) + b_conv1)
+                conv1 = tf.nn.relu(self.conv2d(self.x, W_conv1,[1,4,4,1] ) + b_conv1)
 
             name = "conv2"
             with tf.variable_scope(name) as scope:
@@ -90,8 +95,8 @@ class AgentClass(object):
                 conv3 = tf.nn.relu(self.conv2d(conv2, W_conv3,[1,1,1,1]) + b_conv3)
 
             h_conv3_shape = conv3.get_shape().as_list()
-            print(h_conv3_shape)
-            print("dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
+            #print(h_conv3_shape)
+            #print("dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
 
             name = "fc1"
             with tf.variable_scope(name) as scope:
@@ -102,8 +107,8 @@ class AgentClass(object):
 
             name = "fc2"
             with tf.variable_scope(name) as scope:
-                W_fc2 = self.weight_variable([512, 2],reuse)
-                b_fc2 = self.bias_variable([2],reuse)
+                W_fc2 = self.weight_variable([512, self.num_actions],reuse)
+                b_fc2 = self.bias_variable([self.num_actions],reuse)
 
                 y_conv = tf.matmul(h_fc1, W_fc2) + b_fc2
 
@@ -113,16 +118,19 @@ class AgentClass(object):
 
     def get_action(self,state):
 
-        state = np.zeros( (100,84,84,3)  ).astype(np.float32)
-
-
-        my_feed_dict = {self.x: [np.float32(state / 255.0)] }
+        #print("** get_action input shape..",state.shape)
+        my_feed_dict = {self.x: (state / 255.0) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
-        action = np.argmax(res)
+
+        #print("q_value from nn...", res)
+        action = np.argmax(res[0])
+
+        if self.epsilon > np.random.random():
+            action = np.random.randint(0,self.num_actions)
 
         epsilon = self.epsilon_update()
 
-        return action
+        return action, res[0]
 
     def weight_variable(self,shape,reuse=False):
         with tf.variable_scope("my_scope2", reuse=reuse):
@@ -146,7 +154,7 @@ class AgentClass(object):
         y = tf.placeholder(tf.float32, [None])
 
         # Convert action to one hot vector
-        a_one_hot = tf.one_hot(a, self.num_actions, 1.0, 0.0)
+        a_one_hot = tf.one_hot(a, self.num_actions, on_value=1.0, off_value=0.0)
         q_value = tf.reduce_sum(tf.multiply(y_conv, a_one_hot), reduction_indices=1)
 
         # Clip the error, the loss is quadratic when the error is in (-1, 1), and linear outside of that region

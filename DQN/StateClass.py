@@ -2,7 +2,7 @@
 import numpy as np
 from skimage.transform import resize
 
-from env import setBreakEnv
+from env import setEnv
 
 
 def rgb2gray(rgb):
@@ -23,11 +23,29 @@ class SteteClass(object):
 
         self.image_buffer = []
 
-    def add_buffer(self,predict_action):
+    def render(self):
+        self.env.render()
 
-        pass
+    def envReset(self):
+        obs = self.env.reset()
 
+    def add_buffer(self,obs):
 
+        self.image_buffer.append(obs)
+
+    def clearImageBuffer(self):
+        self.image_buffer = []
+
+    def add_frame(self,action,num_frames):
+
+        self.clearImageBuffer()
+        rewards = 0
+        for i in range(num_frames):
+            tmp_obs, tmp_reward, tmp_done, _ = self.env.step(action)
+            rewards += tmp_reward
+            self.add_buffer(tmp_obs)
+
+        return tmp_obs, rewards, tmp_done
 
     def initial_buffer(self):
 
@@ -46,8 +64,8 @@ class SteteClass(object):
         b = np.stack(black_buffer,axis=0)
         b = np.transpose(b, (1,2,0))
         #b = np.concatenate(black_buffer,axis=2)
-        #return b[np.newaxis,:,:,:]
-        return b
+        return b[np.newaxis,:,:,:]
+        #return b
 
     def convertRGB(self,img):
         g = rgb2gray(img)
