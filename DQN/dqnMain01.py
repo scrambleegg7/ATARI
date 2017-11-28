@@ -38,7 +38,7 @@ def initial_action():
 
     # Converts the list of NUM_FRAMES images in the process buffer
     # into one training sample
-    black_buffer = [resize_gray for _ in range(4) ]
+    black_buffer = [resize_gray for _ in range(3) ]
     black_buffer = [x[:, :, np.newaxis] for x in black_buffer]
     return np.concatenate(black_buffer, axis=2)
 
@@ -80,7 +80,7 @@ def train():
     a, y, loss, grad_update = myAgent.build_training_op(y_q, var_q)
 
     epsilon = 1.0
-    EPSILON_DECAY = 300000
+    EPSILON_DECAY = 300
     FINAL_EPS = 0.1
 
     with tf.Session() as sess:
