@@ -50,6 +50,9 @@ class SteteClass(object):
     def initial_buffer(self):
 
         for i in range(3):
+            #
+            # observation for non action ....
+            #
             st, _, _, _ = self.env.step(0)
             self.image_buffer.append(st)
 
@@ -64,8 +67,8 @@ class SteteClass(object):
         b = np.stack(black_buffer,axis=0)
         b = np.transpose(b, (1,2,0))
         #b = np.concatenate(black_buffer,axis=2)
-        return b[np.newaxis,:,:,:]
-        #return b
+        #return b[np.newaxis,:,:,:]
+        return b
 
     def convertRGB(self,img):
         g = rgb2gray(img)

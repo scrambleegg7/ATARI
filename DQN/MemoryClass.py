@@ -12,6 +12,7 @@ import numpy as np
 
 from collections import deque
 class Memory():
+    
     def __init__(self, max_size = 1000):
         #with deque, buffer is always updated with new one....
         self.buffer = deque(maxlen=max_size)
@@ -20,6 +21,10 @@ class Memory():
         # if data full in deque tube, old data is pushed out from it.
         # then insert new item into tube...
         self.buffer.append(experience)
+
+    def checklength(self):
+
+        return len(self.buffer)
 
     def checkBuffer(self):
 
