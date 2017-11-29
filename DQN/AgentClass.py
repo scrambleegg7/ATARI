@@ -27,6 +27,8 @@ class AgentClass(object):
         self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
         print("** AgentClass x: ",self.x.get_shape().as_list())
 
+
+
         self.y_q_values , var_q = self.build_Q()
         # intialize Target Network
         self.y_target , var_target = self.build_target()
@@ -34,7 +36,7 @@ class AgentClass(object):
 
         self.loss, self.grad_update = self.build_training_op(self.y_q_values, var_q)
 
-        self.copyTargetQNetworkOperation = [var_target[i].assign(var_q[i]) for i in range(len(var_target))]
+        self.copyTargetQNetworkOperation = [v_t.assign(var_q[i]) for i,v_t in enumerate(var_target)]
 
         #
         self.replay_memory = deque()
@@ -42,8 +44,12 @@ class AgentClass(object):
         self.total_loss = 0
 
 
-
-
+        print("** Q weights and biases name ..")
+        for v in var_q:
+            print(v.name)
+        print("** target weights and biases name ..")
+        for v in var_target:
+            print(v.name)
 
         self.sess = tf.Session()
         print("check var of q_network and target_network...")
@@ -52,11 +58,19 @@ class AgentClass(object):
         self.sess.run(init_op)
         saver = tf.train.Saver()
 
+        sess_var_q = self.sess.run(var_q)
+        sess_var_target = self.sess.run(var_target)
+        print("** Q weights and biases name ..")
+        for v in sess_var_q:
+            print(v.shape)
+        print("** target weights and biases name ..")
+        for v in var_target:
+            print(v.name)
 
 
     def checkWeights(self):
 
-
+        pass
 
 
 
@@ -87,20 +101,20 @@ class AgentClass(object):
 
             x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
 
-            name = "conv1" + main_name
+            name = "conv1"
             with tf.variable_scope(name) as scope:
                 W_conv1 = self.weight_variable([8, 8, STATE_LENGTH, 32])
                 b_conv1 = self.bias_variable([32])
                 #conv1 = tf.nn.relu(self.conv2d(self.x, W_conv1,[1,4,4,1] ) + b_conv1)
                 conv1 = tf.nn.relu(self.conv2d(x_image, W_conv1,[1,4,4,1] ) + b_conv1)
 
-            name = "conv2" + main_name
+            name = "conv2"
             with tf.variable_scope(name) as scope:
                 W_conv2 = self.weight_variable([4, 4, 32, 64],reuse)
                 b_conv2 = self.bias_variable([64],reuse)
                 conv2 = tf.nn.relu(self.conv2d(conv1, W_conv2,[1,2,2,1]) + b_conv2)
 
-            name = "conv3" + main_name
+            name = "conv3"
             with tf.variable_scope(name) as scope:
                 W_conv3 = self.weight_variable([3, 3, 64, 64],reuse)
                 b_conv3 = self.bias_variable([64],reuse)
@@ -110,14 +124,14 @@ class AgentClass(object):
             #print(h_conv3_shape)
             #print("dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
 
-            name = "fc1" + main_name
+            name = "fc1"
             with tf.variable_scope(name) as scope:
                 W_fc1 = self.weight_variable([7 * 7 * 64, 512],reuse)
                 b_fc1 = self.bias_variable([512],reuse)
                 h_flat = tf.reshape(conv3, [-1, 7*7*64])
                 h_fc1 = tf.nn.relu(tf.matmul(h_flat, W_fc1) + b_fc1)
 
-            name = "fc2" + main_name
+            name = "fc2"
             with tf.variable_scope(name) as scope:
                 W_fc2 = self.weight_variable([512, self.num_actions],reuse)
                 b_fc2 = self.bias_variable([self.num_actions],reuse)

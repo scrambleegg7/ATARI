@@ -87,7 +87,6 @@ def keepMemory(memory_size=10000, pretrain_length=5000,render=False):
             print("** rewards from done ...", total_reward)
             print("** maxium lived frame .. ", alive_frame)
 
-
             stateCls.envReset()
             # Start new episode
             # Take one random step to get the pole and cart moving
