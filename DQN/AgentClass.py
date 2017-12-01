@@ -170,7 +170,7 @@ class AgentClass(object):
         return action, res[0]
 
     def get_q_value(self,state):
-        
+
         state = self.checkStateImageShape(state)
         my_feed_dict = {self.x: (state / 255.0) }
 
@@ -221,7 +221,7 @@ class AgentClass(object):
 
     def train(self,mini_batch):
 
-        DECAY_RATE = .99
+        DECAY_RATE = .97
 
         states = np.array([each[0] for each in mini_batch])
         actions = np.array([each[1] for each in mini_batch])
@@ -277,6 +277,9 @@ class AgentClass(object):
             print("** copy Qnetwork w/b --> target network w/b ...")
             self.copyTargetQNetwork()
 
+        if self.train_loop_counter % 20000 == 0:
+            self.saver(self.sess,"tfmodel/dqnMain",global_step=self.train_loop_counter)
+            print("    model saved.. ")
         self.train_loop_counter += 1
 
         #for i in range(batch_size):

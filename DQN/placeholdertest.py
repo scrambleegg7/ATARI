@@ -24,6 +24,7 @@ def getV1():
         res = tf.matmul( x_p, W )
 
     var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,"my_weights")
+    tf.summary.histogram('result1', res)
 
     return var, res
 
@@ -36,9 +37,19 @@ def getV2():
 
         res = tf.matmul(x_p, W)
 
+
     var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,"my_weights2")
 
     return var, res
+
+summary1 = tf.Variable(.0)
+tf.summary.scalar('summary1', summary1)
+summary2 = tf.Variable(.0)
+tf.summary.scalar('summary2', summary2)
+
+summ_vars = [summary1,summary2]
+summ_placeholders = [tf.placeholder(np.float32) for _ in range(len(summ_vars))]
+summ_ops = [summ_vars[i].assign( summ_placeholders[i] ) for i in range(len(summ_vars)) ]
 
 tfv1,res1 = getV1()
 for v in tfv1:
@@ -53,6 +64,12 @@ copyTargetQNetworkOperation = [v.assign( tfv1[i] ) for i, v in enumerate(tfv2)]
 
 
 with tf.Session() as sess:
+
+    merged = tf.summary.merge_all()
+    train_writer = tf.summary.FileWriter('tfmodel/test',
+                                      sess.graph)
+
+
 
     init_op = tf.group(tf.global_variables_initializer(),
                    tf.local_variables_initializer())
@@ -76,6 +93,16 @@ with tf.Session() as sess:
     sess_res2 = sess.run(res2, feed_dict=feed_dict)
     print(sess_res1)
     print(sess_res2)
+
+
+    user_vars = [1,1]
+    for i in range(len(user_vars)):
+        sess.run( summ_ops[i],feed_dict={summ_placeholders[i]:user_vars[i]}  )
+
+
+    summary = sess.run(merged , feed_dict=feed_dict)
+    train_writer.add_summary(summary, 10)
+
 
     sess.run(copyTargetQNetworkOperation)
     sess_res1 = sess.run(res1, feed_dict=feed_dict)

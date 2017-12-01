@@ -18,10 +18,10 @@ from AgentClass import AgentClass
 goal_average_steps = 195
 max_number_of_steps = 2000
 num_consecutive_iterations = 100
-num_episodes = 100
+num_episodes = 500
 
 
-memory_size = 500
+memory_size = 1000
 memory = Memory(max_size=memory_size)
 
 MINIBATCH_SIZE = 32
@@ -41,7 +41,7 @@ def rgb2gray(rgb):
 def get_initial_state(observation, last_observation):
     processed_observation = np.maximum(observation, last_observation)
     processed_observation = np.uint8(resize(rgb2gray(processed_observation), (84, 84)) * 255)
-    state = [processed_observation for _ in xrange(3)]
+    state = [processed_observation for _ in range(3)]
     stacked_image = np.stack(state, axis=0)
 
     #
