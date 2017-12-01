@@ -56,6 +56,34 @@ class SteteClass(object):
             st, _, _, _ = self.env.step(0)
             self.image_buffer.append(st)
 
+    def initial_buffer2(self):
+
+        self.clearImageBuffer()
+        observation = self.envReset()
+
+        #
+        # forward game screen with random number iteration
+        # action -- nothing to move any cursor
+        #
+        for i in range(np.random.randint(1,10)):
+            #
+            # observation for non action ....
+            #
+            last_observation = observation
+            observation, _, _, _ = self.env.step(0)
+            #self.image_buffer.append(st)
+
+        processed_image = self.preprocess(observation,last_observation)
+        for _ in range(3):
+            self.image_buffer.append(processed_image)
+
+    def preprocess(self, observation, last_observation):
+
+        processed_observation = np.maximum(observation, last_observation)
+        #processed_observation = np.uint8(resize(rgb2gray(processed_observation), (84, 84)) * 255)
+        # rgb image 84x84
+        return processed_observation
+
     def convertAndConcatenateBuffer(self):
 
         buffers = []

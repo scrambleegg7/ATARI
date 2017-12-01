@@ -67,7 +67,7 @@ def keepMemory(memory_size=10000, pretrain_length=5000,render=False):
 
         init_state = stateCls.convertAndConcatenateBuffer()
         action, q_values = myAgent.get_action(curr_state)
-        curr_state_actions.append(action)
+        #curr_state_actions.append(action)
 
         #print("** action and q_value ... ",action, q_values)
         #myAgent.copyTargetQNetwork()
@@ -101,6 +101,7 @@ def keepMemory(memory_size=10000, pretrain_length=5000,render=False):
         if memory.checklength() > MIN_OBSERVATION:
             MEMORY_FULL = True
             # Sample mini-batch from memory
+            # pick up m = 32
             mini_batch = memory.sample(MINIBATCH_SIZE)
             myAgent.train(mini_batch)
 
@@ -123,7 +124,7 @@ def keepMemory(memory_size=10000, pretrain_length=5000,render=False):
 
 def main():
 
-    actions =  keepMemory(memory_size=1000,pretrain_length=1000)
+    actions =  keepMemory(memory_size=5000,pretrain_length=50000)
 
 if __name__ == "__main__":
     main()

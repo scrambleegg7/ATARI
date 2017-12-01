@@ -27,8 +27,6 @@ class AgentClass(object):
         self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
         print("** AgentClass x: ",self.x.get_shape().as_list())
 
-
-
         self.y_q_values , var_q = self.build_Q()
         # intialize Target Network
         self.y_target , var_target = self.build_target()
@@ -43,7 +41,6 @@ class AgentClass(object):
 
         self.total_loss = 0
 
-
         print("** Q weights and biases name ..")
         for v in var_q:
             print(v.name)
@@ -52,14 +49,16 @@ class AgentClass(object):
             print(v.name)
 
         self.sess = tf.Session()
-        print("check var of q_network and target_network...")
         init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
         self.sess.run(init_op)
-        saver = tf.train.Saver()
+        self.saver = tf.train.Saver()
 
         sess_var_q = self.sess.run(var_q)
         sess_var_target = self.sess.run(var_target)
+
+        print("check var of q_network and target_network...")
+
         print("** Q weights and biases name ..")
         for v in sess_var_q:
             print(v.shape)
@@ -67,12 +66,10 @@ class AgentClass(object):
         for v in var_target:
             print(v.name)
 
+        self.train_loop_counter = 0
 
     def checkWeights(self):
-
         pass
-
-
 
     def epsilon_update(self):
         if self.epsilon > FINAL_EPSILON:
@@ -94,7 +91,6 @@ class AgentClass(object):
         return y_target_conv, target_q_values
 
     def build_network(self,main_name="Q",reuse=False):
-
         # reuse is used to share weight and other values..
 
         with tf.variable_scope(main_name) as scope:
@@ -142,9 +138,22 @@ class AgentClass(object):
         # return fc final layer and var
         return y_conv, var
 
+    def checkStateImageShape(self,state):
+
+        shape_format = state.shape
+        if len(shape_format) == 3:
+            state = state[np.newaxis,:,:,:]
+        return state
+
     def get_action(self,state):
 
+        state = self.checkStateImageShape(state)
+
+        #shape_format = state.shape
+        #if len(shape_format) == 3:
+        #    state = state[np.newaxis,:,:,:]
         #print("** get_action input shape..",state.shape)
+
         my_feed_dict = {self.x: (state / 255.0) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
 
@@ -156,7 +165,20 @@ class AgentClass(object):
 
         epsilon = self.epsilon_update()
 
+        #print("decayed epsilon ....", epsilon)
+
         return action, res[0]
+
+    def get_q_value(self,state):
+        
+        state = self.checkStateImageShape(state)
+        my_feed_dict = {self.x: (state / 255.0) }
+
+        #
+        # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
+        #
+        res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
+        return res[0]
 
     def weight_variable(self,shape,reuse=False):
         with tf.variable_scope("my_weights", reuse):
@@ -225,7 +247,9 @@ class AgentClass(object):
         #
         my_feed_dict2 = {self.x: (next_states / 255.0) }
         target_q_values2 = self.sess.run( self.y_target, feed_dict = my_feed_dict2 )
-        selected_target_actions = np.argmax(target_q_values2, axis=1)
+
+        # select target q value (max Q(st+1, a, theta_target ))
+        selected_target_actions = np.max(target_q_values2, axis=1)
 
         #print("selected action (init_state)")
         #print(selected_actions)
@@ -247,7 +271,14 @@ class AgentClass(object):
                                 feed_dict = loss_feed_dict)
 
         self.total_loss += loss
-        #print(loss)
+
+        if self.train_loop_counter % 10000 == 9999:
+            print("    training counter...", self.train_loop_counter)
+            print("** copy Qnetwork w/b --> target network w/b ...")
+            self.copyTargetQNetwork()
+
+        self.train_loop_counter += 1
+
         #for i in range(batch_size):
         #    init_state = states[i]
         #    targets[i] = self.model.predict(, batch_size = 1)
@@ -255,7 +286,13 @@ class AgentClass(object):
         #    targets[i, a_batch[i]] = r_batch[i]
         #    if d_batch[i] == False:
         #    targets[i, a_batch[i]] += DECAY_RATE * np.max(fut_action)
+        #return loss
 
+    def resetTotalloss(self):
+        self.total_loss = 0
+
+    def getTotalloss(self):
+        return self.total_loss
 
 def main():
 
