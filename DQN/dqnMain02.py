@@ -21,7 +21,7 @@ num_consecutive_iterations = 100
 num_episodes = 500
 
 
-memory_size = 1000
+memory_size = 3000
 memory = Memory(max_size=memory_size)
 
 MINIBATCH_SIZE = 32
@@ -32,6 +32,8 @@ SAVE_SUMMARY_PATH = 'summary/' + ENV_NAME
 
 env = gym.make(ENV_NAME)
 myAgent = AgentClass(env.action_space.n)
+
+
 
 
 def rgb2gray(rgb):
@@ -66,8 +68,9 @@ def trainProc():
 
     print("SpaceInvador action number..",  env.action_space.n )
 
-    last_time_steps = np.zeros(num_consecutive_iterations)
+    #last_time_steps = np.zeros(num_consecutive_iterations)
 
+    global_steps = 0
 
     for episode in range(num_episodes):
         #
@@ -104,7 +107,8 @@ def trainProc():
             #
             #state_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
             #memory.add((state_image, action, rewards, done, processed_image))
-            state_image, max_q_value = run(step, state_image, action, reward, done, processed_image)
+            state_image, max_q_value = run(global_steps,step,state_image, action, reward, done, processed_image)
+            global_steps += 1
 
             episode_max_q_value += max_q_value
 
@@ -112,18 +116,19 @@ def trainProc():
                 #
                 # finish n episodes
                 #
+                if memory.checklength() > (memory_size-1):
+                    #total_loss = myAgent.getTotalloss()
+                    myAgent.write_tfValueLog(step,episode,reward,episode_max_q_value)
 
-                print('%d Episode finished after %f steps / mean %f' %
-                            (episode, step + 1, episode_reward / (step+1)) )
-                print("   avg. training_loss ..", myAgent.getTotalloss() / step)
-                print("   avg. max_q_value ..", episode_max_q_value / step)
-
-                myAgent.resetTotalloss()
+                    #print('%d Episode finished after %f steps / mean %f' %
+                    #            (episode, step + 1, episode_reward / (step+1)) )
+                    #print("   avg. training_loss ..", myAgent.getTotalloss() / step)
+                    #print("   avg. max_q_value ..", episode_max_q_value / step)
 
             step += 1
 
 
-def run(step, state_image, action, rewards, done, processed_image):
+def run(global_steps,step,state_image,action,rewards,done,processed_image):
 
     next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
     memory.add((state_image, action, rewards, done, next_image))
@@ -135,10 +140,8 @@ def run(step, state_image, action, rewards, done, processed_image):
     #print( memory.checklength() )
     if memory.checklength() > (memory_size-1) and step % 3 == 1:
         mini_batch = memory.sample(batch_size=MINIBATCH_SIZE)
-        myAgent.train(mini_batch)
+        myAgent.train(mini_batch, global_steps)
 
-    if done:
-        pass
 
     return next_image, max_q_value
 

@@ -48,11 +48,20 @@ class AgentClass(object):
         for v in var_target:
             print(v.name)
 
+
+        self.summary_vars, self.summary_ph, self.summary_op = \
+                        self.update_summary()
+
+
         self.sess = tf.Session()
         init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
         self.sess.run(init_op)
         self.saver = tf.train.Saver()
+
+        self.merged = tf.summary.merge_all()
+        self.train_writer = tf.summary.FileWriter('tfmodel/test',
+                                      self.sess.graph)
 
         sess_var_q = self.sess.run(var_q)
         sess_var_target = self.sess.run(var_target)
@@ -68,8 +77,22 @@ class AgentClass(object):
 
         self.train_loop_counter = 0
 
-    def checkWeights(self):
-        pass
+    def update_summary(self):
+
+        episode_reward_mean = tf.Variable(.0)
+        tf.summary.scalar('episode_reward_mean', episode_reward_mean)
+
+        training_loss_mean = tf.Variable(.0)
+        tf.summary.scalar('training_loss_mean', training_loss_mean)
+
+        maxq_mean = tf.Variable(.0)
+        tf.summary.scalar('maxq_mean', maxq_mean)
+
+        summary_vars = [episode_reward_mean,training_loss_mean,maxq_mean]
+        summary_ph = [tf.placeholder(tf.float32) for _ in summary_vars]
+        summary_op = [summary_vars[i].assign(summary_ph[i]) for i in range(len(summary_vars)) ]
+
+        return summary_vars, summary_ph, summary_op
 
     def epsilon_update(self):
         if self.epsilon > FINAL_EPSILON:
@@ -223,7 +246,7 @@ class AgentClass(object):
 
         return loss, grad_update
 
-    def train(self,mini_batch):
+    def train(self,mini_batch,global_steps):
 
         DECAY_RATE = .99
 
@@ -267,6 +290,7 @@ class AgentClass(object):
         #    if d[i] == False:
 
         #y_q = rewards_binary + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
+        # actual reward should be used....
         y_q = rewards + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
 
         loss_feed_dict ={   self.a_place: actions,
@@ -275,17 +299,17 @@ class AgentClass(object):
         loss, _ = self.sess.run([self.loss, self.grad_update],
                                 feed_dict = loss_feed_dict)
 
+
         self.total_loss += loss
 
-        if self.train_loop_counter % 10000 == 9999:
-            print("    training counter...", self.train_loop_counter)
+        if global_steps % 10000 == 9999:
+            print("    training counter...", global_steps)
             print("** copy Qnetwork w/b --> target network w/b ...")
             self.copyTargetQNetwork()
 
-        if self.train_loop_counter % 20000 == 19999:
-            self.saver.save(self.sess,"tfmodel/dqnMain",global_step=self.train_loop_counter)
+        if global_steps % 20000 == 19999:
+            self.saver.save(self.sess,"tfmodel/dqnMain",global_step=global_steps)
             print("    model saved.. ")
-        self.train_loop_counter += 1
 
         #for i in range(batch_size):
         #    init_state = states[i]
@@ -295,6 +319,26 @@ class AgentClass(object):
         #    if d_batch[i] == False:
         #    targets[i, a_batch[i]] += DECAY_RATE * np.max(fut_action)
         #return loss
+
+    def write_tfValueLog(self,steps,episode,reward,episode_max_q_value):
+
+        episode_reward_mean = reward / steps
+        training_loss_mean = self.getTotalloss() / steps
+        maxq_mean = episode_max_q_value / steps
+
+        print("-" * 40)
+        print("***Episode %d finished after %d steps..." %  (episode,steps)  )
+        print("   avg reward %.6f - total reward %6f" % (episode_reward_mean, reward)  )
+        print("   avg loss %.6f" % training_loss_mean)
+
+        stats = [episode_reward_mean,training_loss_mean,maxq_mean]
+        for i in range(len(stats)):
+            self.sess.run( self.summary_op[i],
+                feed_dict={self.summary_ph[i]:stats[i]})
+
+        summary = self.sess.run( self.merged )
+        self.train_writer.add_summary(summary,episode+1)
+        self.resetTotalloss()
 
     def resetTotalloss(self):
         self.total_loss = 0
