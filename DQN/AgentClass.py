@@ -237,7 +237,6 @@ class AgentClass(object):
         # not used clipping
         loss = tf.reduce_mean(tf.square( self.y_place - q_value ))
 
-
         MOMENTUM = 0.95
         MIN_GRAD = 0.01
         LEARNING_RATE = 0.00025

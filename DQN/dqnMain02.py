@@ -80,11 +80,12 @@ def trainProc():
             last_observation = observation
             observation, reward, done, info = env.step(0)
 
+            #print( np.min(observation.ravel()), np.max(observation.ravel()) )
+
         #print("** making initial state image...")
         state_image = get_initial_state(observation, last_observation)
-        #plt.imshow(image[1:,:,:])
-        #plt.show()
-        #break
+        print( np.min(state_image.ravel()), np.max(state_image.ravel()) )
+
 
         episode_reward = 0
         episode_max_q_value = 0
@@ -118,11 +119,11 @@ def trainProc():
                 #
                 if memory.checklength() > (memory_size-1):
                     #total_loss = myAgent.getTotalloss()
-                    myAgent.write_tfValueLog(step,episode,reward,episode_max_q_value)
+                    #myAgent.write_tfValueLog(step,episode,episode_reward,episode_max_q_value)
 
-                    #print('%d Episode finished after %f steps / mean %f' %
-                    #            (episode, step + 1, episode_reward / (step+1)) )
-                    #print("   avg. training_loss ..", myAgent.getTotalloss() / step)
+                    print('%d Episode finished after %f steps / mean %f' %
+                                (episode, step + 1, episode_reward / (step+1)) )
+                    print("   avg. training_loss ..", myAgent.getTotalloss() / step)
                     #print("   avg. max_q_value ..", episode_max_q_value / step)
 
             step += 1
