@@ -12,7 +12,7 @@ env = gym.make('SpaceInvaders-v0')
 goal_average_steps = 195
 max_number_of_steps = 2000
 num_consecutive_iterations = 100
-num_episodes = 5
+num_episodes = 100
 last_time_steps = []
 
 def rgb2gray(rgb):
@@ -37,6 +37,8 @@ def preprocess(observation, last_observation):
 
 
 print("SpaceInvador action number..",  env.action_space.n )
+
+total_episode_rewards = []
 
 for episode in range(num_episodes):
     #
@@ -68,15 +70,10 @@ for episode in range(num_episodes):
         if done:
             #print(observation,reward,done,info)
 
-            print('%d Episode finished after %f time steps / mean %f' % (episode, t + 1,
-                last_time_steps.mean()))
-            last_time_steps.append(episoe)
-            print("episode reward : ",episode_reward)
+            print('%d Episode finished after %f steps / mean %f' % (episode, t + 1,  episode_reward / (t+1)  ))
+            #print("episode reward : ",episode_reward)
+            total_episode_rewards.append( episode_reward / (t+1) )
 
             break
 
-    if (last_time_steps.mean() >= goal_average_steps):
-        print('Episode %d train agent successfuly!' % episode)
-        break
-
-print(state_image.shape)
+print("avg. reward mean / episodes ", np.mean( total_episode_rewards ))

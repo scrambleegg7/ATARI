@@ -209,7 +209,11 @@ class AgentClass(object):
         error = tf.abs(self.y_place - q_value)
         quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
         linear_part = error - quadratic_part
-        loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+        #loss = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+
+        # not used clipping
+        loss = tf.reduce_mean(tf.square( self.y_place - q_value ))
+
 
         MOMENTUM = 0.95
         MIN_GRAD = 0.01
@@ -221,7 +225,7 @@ class AgentClass(object):
 
     def train(self,mini_batch):
 
-        DECAY_RATE = .97
+        DECAY_RATE = .99
 
         states = np.array([each[0] for each in mini_batch])
         actions = np.array([each[1] for each in mini_batch])
@@ -262,7 +266,8 @@ class AgentClass(object):
         #for d in dones:
         #    if d[i] == False:
 
-        y_q = rewards_binary + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
+        #y_q = rewards_binary + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
+        y_q = rewards + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
 
         loss_feed_dict ={   self.a_place: actions,
                             self.y_place:y_q,
@@ -277,8 +282,8 @@ class AgentClass(object):
             print("** copy Qnetwork w/b --> target network w/b ...")
             self.copyTargetQNetwork()
 
-        if self.train_loop_counter % 20000 == 0:
-            self.saver(self.sess,"tfmodel/dqnMain",global_step=self.train_loop_counter)
+        if self.train_loop_counter % 20000 == 19999:
+            self.saver.save(self.sess,"tfmodel/dqnMain",global_step=self.train_loop_counter)
             print("    model saved.. ")
         self.train_loop_counter += 1
 
