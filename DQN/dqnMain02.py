@@ -84,7 +84,7 @@ def trainProc():
 
         #print("** making initial state image...")
         state_image = get_initial_state(observation, last_observation)
-        print( np.min(state_image.ravel()), np.max(state_image.ravel()) )
+        #print( np.min(state_image.ravel()), np.max(state_image.ravel()) )
 
 
         episode_reward = 0
@@ -108,7 +108,7 @@ def trainProc():
             #
             #state_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
             #memory.add((state_image, action, rewards, done, processed_image))
-            state_image, max_q_value = run(global_steps,step,state_image, action, reward, done, processed_image)
+            state_image, max_q_value = run(global_steps,state_image, action, reward, done, processed_image)
             global_steps += 1
 
             episode_max_q_value += max_q_value
@@ -125,11 +125,9 @@ def trainProc():
                                 (episode, step + 1, episode_reward / (step+1)) )
                     print("   avg. training_loss ..", myAgent.getTotalloss() / step)
                     #print("   avg. max_q_value ..", episode_max_q_value / step)
-
             step += 1
 
-
-def run(global_steps,step,state_image,action,rewards,done,processed_image):
+def run(global_steps,state_image,action,rewards,done,processed_image):
 
     next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
     memory.add((state_image, action, rewards, done, next_image))
@@ -139,10 +137,9 @@ def run(global_steps,step,state_image,action,rewards,done,processed_image):
 
     # default training_loss :
     #print( memory.checklength() )
-    if memory.checklength() > (memory_size-1) and step % 3 == 1:
+    if memory.checklength() > (memory_size-1) and global_steps % 3 == 1:
         mini_batch = memory.sample(batch_size=MINIBATCH_SIZE)
         myAgent.train(mini_batch, global_steps)
-
 
     return next_image, max_q_value
 
@@ -151,5 +148,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#print(state_image.shape)

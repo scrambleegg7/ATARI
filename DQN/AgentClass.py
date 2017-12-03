@@ -203,6 +203,17 @@ class AgentClass(object):
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
         return res[0]
 
+    def get_q_target_value(self,state):
+
+        state = self.checkStateImageShape(state)
+        my_feed_dict = {self.x: (state / 255.0) }
+
+        #
+        # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
+        #
+        res = self.sess.run( self.y_target, feed_dict = my_feed_dict )
+        return res[0]
+
     def weight_variable(self,shape,reuse=False):
         with tf.variable_scope("my_weights", reuse):
             initial_value = tf.truncated_normal(shape, stddev=0.1)
@@ -247,7 +258,7 @@ class AgentClass(object):
 
     def train(self,mini_batch,global_steps):
 
-        DECAY_RATE = .99
+        DECAY_RATE = .98
 
         states = np.array([each[0] for each in mini_batch])
         actions = np.array([each[1] for each in mini_batch])
@@ -288,9 +299,9 @@ class AgentClass(object):
         #for d in dones:
         #    if d[i] == False:
 
-        #y_q = rewards_binary + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
+        y_q = rewards_binary + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
         # actual reward should be used....
-        y_q = rewards + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
+        #y_q = rewards + (1. - dones.astype(int)) * DECAY_RATE * selected_target_actions
 
         loss_feed_dict ={   self.a_place: actions,
                             self.y_place:y_q,
