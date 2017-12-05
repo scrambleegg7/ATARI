@@ -10,9 +10,15 @@ INITIAL_EPSILON = 1.0
 FINAL_EPSILON = 0.1  #
 EXPLORATION_STEPS = 1000000  #
 
-FRAME_WIDTH = 84
-FRAME_HEIGHT = 84
+FRAME_WIDTH = 2
+FRAME_HEIGHT = 2
 #STATE_LENGTH  = 3
+
+NUM_HIDDEN1=128
+NUM_HIDDEN2=128
+
+NUM_INPUT=4
+NUM_OUTPUT=5
 
 class AgentClass(object):
 
@@ -25,56 +31,18 @@ class AgentClass(object):
         self.repeated_action = 0
 
         self.STATE_LENGTH = STATE_LENGTH
-        self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
+        self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT] )
         print("** AgentClass x: ",self.x.get_shape().as_list())
 
-        self.y_q_values , var_q = self.build_Q(STATE_LENGTH)
-        # intialize Target Network
-        self.y_target , var_target = self.build_target(STATE_LENGTH)
-        # get traing loss
-
-        self.loss, self.grad_update = self.build_training_op(self.y_q_values, var_q)
-
-        self.copyTargetQNetworkOperation = [v_t.assign(var_q[i]) for i,v_t in enumerate(var_target)]
-
-        #
-        self.replay_memory = deque()
-
-        self.total_loss = 0
-
-        print("** Q weights and biases name ..")
-        for v in var_q:
-            print(v.name)
-        print("** target weights and biases name ..")
-        for v in var_target:
-            print(v.name)
-
-
-        self.summary_vars, self.summary_ph, self.summary_op = \
-                        self.update_summary()
-
+        self.y_q_values = self.build_network_dense("Q",NUM_INPUT,NUM_HIDDEN1,NUM_HIDDEN2,NUM_OUTPUT)
 
         self.sess = tf.Session()
         init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
         self.sess.run(init_op)
-        self.saver = tf.train.Saver()
+        #self.saver = tf.train.Saver()
 
-        self.merged = tf.summary.merge_all()
-        self.train_writer = tf.summary.FileWriter('tfmodel/test',
-                                      self.sess.graph)
 
-        sess_var_q = self.sess.run(var_q)
-        sess_var_target = self.sess.run(var_target)
-
-        print("check var of q_network and target_network...")
-
-        print("** Q weights and biases name ..")
-        for v in sess_var_q:
-            print(v.shape)
-        print("** target weights and biases name ..")
-        for v in var_target:
-            print(v.name)
 
         self.train_loop_counter = 0
 
@@ -113,6 +81,38 @@ class AgentClass(object):
         y_target_conv, target_q_values = self.build_network(main_name="target",STATE_LENGTH=3)
         #target_network_weights = target_network.trainable_weights
         return y_target_conv, target_q_values
+
+
+
+    def build_network_dense(self,main_name,NUM_INPUT,NUM_HIDDEN1, NUM_HIDDEN2, NUM_OUTPUT):
+        # reuse is used to share weight and other values..
+
+        with tf.variable_scope(main_name) as scope:
+
+            stddev=0.01
+
+            x_ph = tf.reshape(self.x, [-1,2*2])
+
+            with tf.name_scope('hidden1'):
+                weights = tf.Variable(tf.truncated_normal([NUM_INPUT, NUM_HIDDEN1], stddev=stddev), name='weights')
+                biases = tf.Variable(tf.zeros([NUM_HIDDEN1], dtype=tf.float32), name='biases')
+                #hidden1 = tf.nn.relu(tf.matmul(x_ph, weights) + biases)
+                hidden1 = tf.sin(tf.matmul(x_ph, weights) + biases)
+                #
+                # relu is not good way to coverge loss function...
+                #
+
+            with tf.name_scope('hidden2'):
+                weights = tf.Variable(tf.truncated_normal([NUM_HIDDEN1, NUM_HIDDEN2], stddev=stddev), name='weights')
+                biases = tf.Variable(tf.zeros([NUM_HIDDEN2], dtype=tf.float32), name='biases')
+                hidden2 = tf.nn.relu(tf.matmul(hidden1, weights) + biases)
+
+            with tf.name_scope('output'):
+                weights = tf.Variable(tf.truncated_normal([NUM_HIDDEN2, NUM_OUTPUT], stddev=stddev), name='weights')
+                biases = tf.Variable(tf.zeros([NUM_OUTPUT], dtype=tf.float32), name='biases')
+                y = tf.matmul(hidden2, weights) + biases
+
+            return y
 
     def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False):
         # reuse is used to share weight and other values..
@@ -179,7 +179,7 @@ class AgentClass(object):
         #    state = state[np.newaxis,:,:,:]
         #print("** get_action input shape..",state.shape)
 
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
 
         #print("q_value from nn...", res)
@@ -197,7 +197,7 @@ class AgentClass(object):
     def get_q_value(self,state):
 
         state = self.checkStateImageShape(state)
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
 
         #
         # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
@@ -208,7 +208,7 @@ class AgentClass(object):
     def get_q_target_value(self,state):
 
         state = self.checkStateImageShape(state)
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
 
         #
         # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
@@ -271,7 +271,7 @@ class AgentClass(object):
         batch_size = len(mini_batch)
         targets = np.zeros((batch_size, self.num_actions))
 
-        my_feed_dict = {self.x: (states / 255.0) }
+        my_feed_dict = {self.x: (states) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
 
         # copy target matrix eg. 32(batch size) x 6 (num of actions)
@@ -284,7 +284,7 @@ class AgentClass(object):
         rewards_binary = (rewards > 0).astype(int)
 
         #
-        my_feed_dict2 = {self.x: (next_states / 255.0) }
+        my_feed_dict2 = {self.x: (next_states) }
         target_q_values2 = self.sess.run( self.y_target, feed_dict = my_feed_dict2 )
 
         # select target q value (max Q(st+1, a, theta_target ))
@@ -307,7 +307,7 @@ class AgentClass(object):
 
         loss_feed_dict ={   self.a_place: actions,
                             self.y_place:y_q,
-                            self.x:(states / 255.0)  }
+                            self.x:(states)  }
         loss, _ = self.sess.run([self.loss, self.grad_update],
                                 feed_dict = loss_feed_dict)
 

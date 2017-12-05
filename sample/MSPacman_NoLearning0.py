@@ -1,3 +1,4 @@
+#
 
 import gym
 import numpy as np
@@ -8,8 +9,10 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
-
-env = gym.make('SpaceInvaders-v0')
+import gym_pull
+#gym_pull.pull('github.com/ppaquette/gym-super-mario')
+# Only required once, envs will be loaded with import gym_pull afterwards
+env = gym.make('MsPacman-v0')
 
 goal_average_steps = 195
 max_number_of_steps = 2000
@@ -38,7 +41,7 @@ def preprocess(observation, last_observation):
     #return np.reshape(processed_observation, (1, FRAME_WIDTH, FRAME_HEIGHT))
 
 
-print("SpaceInvador action number..",  env.action_space.n )
+print("MarioBrother action number..",  env.action_space.n )
 
 total_episode_rewards = []
 
@@ -57,6 +60,10 @@ with tf.Session() as sess:
     for episode in range(num_episodes):
         #
         observation = env.reset()
+        #print("observation shape" , observation.shape)
+        #plt.imshow(observation)
+        #plt.show()
+        #break
 
         for _ in range(np.random.randint(1,10)):
             last_observation = observation
@@ -78,8 +85,8 @@ with tf.Session() as sess:
             # action =
             episode_reward += reward
 
-            if reward > 0:
-                print("reward is not ZERO", t, reward)
+            #if reward > 0:
+                #print("reward is not ZERO", t, reward)
 
             processed_image = preprocess(observation, last_observation)
 

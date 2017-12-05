@@ -33,7 +33,7 @@ class AgentClass(object):
         self.y_target , var_target = self.build_target(STATE_LENGTH)
         # get traing loss
 
-        self.loss, self.grad_update = self.build_training_op(self.y_q_values, var_q)
+        self.loss, self.grad_update, self.global_step = self.build_training_op(self.y_q_values, var_q)
 
         self.copyTargetQNetworkOperation = [v_t.assign(var_q[i]) for i,v_t in enumerate(var_target)]
 
@@ -52,7 +52,6 @@ class AgentClass(object):
 
         self.summary_vars, self.summary_ph, self.summary_op = \
                         self.update_summary()
-
 
         self.sess = tf.Session()
         init_op = tf.group(tf.global_variables_initializer(),
@@ -75,6 +74,8 @@ class AgentClass(object):
         print("** target weights and biases name ..")
         for v in var_target:
             print(v.name)
+
+        self.copyTargetQNetwork()
 
         self.train_loop_counter = 0
 
@@ -105,12 +106,12 @@ class AgentClass(object):
 
     def build_Q(self,STATE_LENGTH):
         # Q Network
-        y_conv, q_network_values = self.build_network(main_name="Qnet",STATE_LENGTH=3)
+        y_conv, q_network_values = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
         return y_conv, q_network_values
 
     def build_target(self,STATE_LENGTH):
         #Target Network
-        y_target_conv, target_q_values = self.build_network(main_name="target",STATE_LENGTH=3)
+        y_target_conv, target_q_values = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
         #target_network_weights = target_network.trainable_weights
         return y_target_conv, target_q_values
 
@@ -168,7 +169,7 @@ class AgentClass(object):
         shape_format = state.shape
         if len(shape_format) == 3:
             state = state[np.newaxis,:,:,:]
-        return state
+        return state / 255.0
 
     def get_action(self,state):
 
@@ -179,7 +180,7 @@ class AgentClass(object):
         #    state = state[np.newaxis,:,:,:]
         #print("** get_action input shape..",state.shape)
 
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
 
         #print("q_value from nn...", res)
@@ -192,12 +193,12 @@ class AgentClass(object):
 
         #print("decayed epsilon ....", epsilon)
 
-        return action, res[0]
+        return action, res
 
     def get_q_value(self,state):
 
         state = self.checkStateImageShape(state)
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
 
         #
         # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
@@ -208,7 +209,7 @@ class AgentClass(object):
     def get_q_target_value(self,state):
 
         state = self.checkStateImageShape(state)
-        my_feed_dict = {self.x: (state / 255.0) }
+        my_feed_dict = {self.x: (state) }
 
         #
         # from Deep Q network (3 layer 32x64x64 -> 512 dense network)
@@ -230,6 +231,7 @@ class AgentClass(object):
 
     def conv2d(self, x, W, strides, name="conv"):
         with tf.variable_scope(name):
+            # padding = VALID
             return tf.nn.conv2d(x, W, strides, padding='VALID')
 
     def build_training_op(self, y_conv, q_network_weights):
@@ -250,13 +252,15 @@ class AgentClass(object):
         # not used clipping
         #loss = tf.reduce_mean(tf.square( self.y_place - q_value ))
 
+        global_step = tf.Variable(0, trainable=False, name='global_step')
+
         MOMENTUM = 0.95
         MIN_GRAD = 0.01
         LEARNING_RATE = 0.00025
         optimizer = tf.train.RMSPropOptimizer(LEARNING_RATE, momentum=MOMENTUM, epsilon=MIN_GRAD)
-        grad_update = optimizer.minimize(loss, var_list=q_network_weights)
+        grad_update = optimizer.minimize(loss, global_step=global_step) #, var_list=q_network_weights)
 
-        return loss, grad_update
+        return loss, grad_update, global_step
 
     def train(self,mini_batch,global_steps):
 
@@ -271,7 +275,7 @@ class AgentClass(object):
         batch_size = len(mini_batch)
         targets = np.zeros((batch_size, self.num_actions))
 
-        my_feed_dict = {self.x: (states / 255.0) }
+        my_feed_dict = {self.x: (states) }
         res = self.sess.run( self.y_q_values, feed_dict = my_feed_dict )
 
         # copy target matrix eg. 32(batch size) x 6 (num of actions)
@@ -284,7 +288,7 @@ class AgentClass(object):
         rewards_binary = (rewards > 0).astype(int)
 
         #
-        my_feed_dict2 = {self.x: (next_states / 255.0) }
+        my_feed_dict2 = {self.x: (next_states) }
         target_q_values2 = self.sess.run( self.y_target, feed_dict = my_feed_dict2 )
 
         # select target q value (max Q(st+1, a, theta_target ))
@@ -307,7 +311,7 @@ class AgentClass(object):
 
         loss_feed_dict ={   self.a_place: actions,
                             self.y_place:y_q,
-                            self.x:(states / 255.0)  }
+                            self.x:(states)  }
         loss, _ = self.sess.run([self.loss, self.grad_update],
                                 feed_dict = loss_feed_dict)
 
