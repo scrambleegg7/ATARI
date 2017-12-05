@@ -16,7 +16,7 @@ FRAME_HEIGHT = 84
 
 class AgentClass(object):
 
-    def __init__(self, num_actions,STATE_LENGTH=3):
+    def __init__(self, num_actions,STATE_LENGTH=3,test=False):
 
         self.num_actions = num_actions  #
         self.epsilon = INITIAL_EPSILON  # g
@@ -28,27 +28,30 @@ class AgentClass(object):
         self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
         print("** AgentClass x: ",self.x.get_shape().as_list())
 
-        self.y_q_values , var_q = self.build_Q(STATE_LENGTH)
+        self.y_q_values , var_q, var_q_name = self.build_Q(STATE_LENGTH)
+
         # intialize Target Network
-        self.y_target , var_target = self.build_target(STATE_LENGTH)
+        self.y_target , var_target, var_target_name = self.build_target(STATE_LENGTH)
         # get traing loss
 
-        self.loss, self.grad_update, self.global_step = self.build_training_op(self.y_q_values, var_q)
+
+        self.loss, self.grad_update,self.global_step = self.build_training_op(self.y_q_values, var_q)
 
         self.copyTargetQNetworkOperation = [v_t.assign(var_q[i]) for i,v_t in enumerate(var_target)]
+        self.copy_ops = [vartarget.assign(var_q_name[vname]) for (vname,vartarget) in var_target_name.items()]
 
         #
         self.replay_memory = deque()
 
         self.total_loss = 0
 
-        print("** Q weights and biases name ..")
-        for v in var_q:
-            print(v.name)
-        print("** target weights and biases name ..")
-        for v in var_target:
-            print(v.name)
-
+        if test:
+            print("** Q weights and biases name ..")
+            for v in var_q:
+                print(v.name)
+            print("** target weights and biases name ..")
+            for v in var_target:
+                print(v.name)
 
         self.summary_vars, self.summary_ph, self.summary_op = \
                         self.update_summary()
@@ -66,18 +69,20 @@ class AgentClass(object):
         sess_var_q = self.sess.run(var_q)
         sess_var_target = self.sess.run(var_target)
 
-        print("check var of q_network and target_network...")
-
-        print("** Q weights and biases name ..")
-        for v in sess_var_q:
-            print(v.shape)
-        print("** target weights and biases name ..")
-        for v in var_target:
-            print(v.name)
+        if test:
+            print("check var of q_network and target_network...")
+            print("** Q weights and biases name ..")
+            for v in sess_var_q:
+                print(v.shape)
+            print("** target weights and biases name ..")
+            for v in var_target:
+                print(v.name)
 
         self.copyTargetQNetwork()
-
         self.train_loop_counter = 0
+
+    def getGlobalSteps(self):
+
 
     def update_summary(self):
 
@@ -101,43 +106,46 @@ class AgentClass(object):
             self.epsilon -= self.epsilon_step
         return self.epsilon
 
+    def copyTargetQNetwork2():
+        self.sess.run( tf.groups(*self.copy_ops) )
+
     def copyTargetQNetwork(self):
         self.sess.run(self.copyTargetQNetworkOperation)
 
     def build_Q(self,STATE_LENGTH):
         # Q Network
-        y_conv, q_network_values = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
-        return y_conv, q_network_values
+        y_conv, q_network_values, q_val_name = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
+        return y_conv, q_network_values, q_val_name
 
     def build_target(self,STATE_LENGTH):
         #Target Network
-        y_target_conv, target_q_values = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
+        y_target_conv, target_q_val, target_val_name = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
         #target_network_weights = target_network.trainable_weights
-        return y_target_conv, target_q_values
+        return y_target_conv, target_q_val,target_val_name
 
     def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False):
         # reuse is used to share weight and other values..
 
-        with tf.variable_scope(main_name) as scope:
+        with tf.variable_scope(main_name) as scopemain:
 
             x_image = self.x
             #x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
 
             name = "conv1"
-            with tf.variable_scope(name) as scope:
+            with tf.variable_scope(name) as scopev1:
                 W_conv1 = self.weight_variable([8, 8, STATE_LENGTH, 32])
                 b_conv1 = self.bias_variable([32])
                 #conv1 = tf.nn.relu(self.conv2d(self.x, W_conv1,[1,4,4,1] ) + b_conv1)
                 conv1 = tf.nn.relu(self.conv2d(x_image, W_conv1,[1,4,4,1] ) + b_conv1)
 
             name = "conv2"
-            with tf.variable_scope(name) as scope:
+            with tf.variable_scope(name) as scopev2:
                 W_conv2 = self.weight_variable([4, 4, 32, 64],reuse)
                 b_conv2 = self.bias_variable([64],reuse)
                 conv2 = tf.nn.relu(self.conv2d(conv1, W_conv2,[1,2,2,1]) + b_conv2)
 
             name = "conv3"
-            with tf.variable_scope(name) as scope:
+            with tf.variable_scope(name) as scopev3:
                 W_conv3 = self.weight_variable([3, 3, 64, 64],reuse)
                 b_conv3 = self.bias_variable([64],reuse)
                 conv3 = tf.nn.relu(self.conv2d(conv2, W_conv3,[1,1,1,1]) + b_conv3)
@@ -147,22 +155,25 @@ class AgentClass(object):
             #print("dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
 
             name = "fc1"
-            with tf.variable_scope(name) as scope:
+            with tf.variable_scope(name) as scopefc1:
                 W_fc1 = self.weight_variable([7 * 7 * 64, 512],reuse)
                 b_fc1 = self.bias_variable([512],reuse)
                 h_flat = tf.reshape(conv3, [-1, 7*7*64])
                 h_fc1 = tf.nn.relu(tf.matmul(h_flat, W_fc1) + b_fc1)
 
             name = "fc2"
-            with tf.variable_scope(name) as scope:
+            with tf.variable_scope(name) as scopefc3:
                 W_fc2 = self.weight_variable([512, self.num_actions],reuse)
                 b_fc2 = self.bias_variable([self.num_actions],reuse)
 
                 y_conv = tf.matmul(h_fc1, W_fc2) + b_fc2
 
         var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
+        var_name = {v.name[len(scopemain.name):]:v for v in var}
+
+        print(var_name)
         # return fc final layer and var
-        return y_conv, var
+        return y_conv, var, var_name
 
     def checkStateImageShape(self,state):
 
