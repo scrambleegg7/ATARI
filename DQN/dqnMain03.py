@@ -18,7 +18,8 @@ from AgentClass_v3 import AgentClass
 num_consecutive_iterations = 100
 num_episodes = 500
 
-memory_size = 20000
+initial_training = 20000 # start point to train the data
+memory_size = 30000
 memory = Memory(max_size=memory_size)
 
 MINIBATCH_SIZE = 32
@@ -108,7 +109,7 @@ def trainProc():
             #action = np.random.randint(0,env.action_space.n)
 
             # input : state_image
-            action, q_value = myAgent.get_action(state_image)
+            action, q_value = myAgent.get_action(state_image, global_steps)
             observation, reward, done, info = env.step(action)
 
             episode_reward += reward
@@ -135,6 +136,7 @@ def trainProc():
 
                     print('%d Episode finished after %f steps / mean %f' %
                                 (episode, step + 1, episode_reward / (step+1)) )
+                    print("   Global Step", global_steps )
                     print("   avg. training_loss ..", myAgent.getTotalloss() / step)
                     #print("   avg. max_q_value ..", episode_max_q_value / step)
 
@@ -143,7 +145,7 @@ def trainProc():
 def run(global_steps,state_image,action,rewards,done,processed_image):
 
     next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
-    state_image /= 255.0 
+    state_image /= 255.0
     next_image /= 255.0
     memory.add((state_image, action, rewards, done, next_image))
 
@@ -152,9 +154,21 @@ def run(global_steps,state_image,action,rewards,done,processed_image):
 
     # default training_loss :
     #print( memory.checklength() )
-    if memory.checklength() > (memory_size-1): # and global_steps % 3 == 0:
+    if global_steps > initial_training and global_steps % 4 == 0:
         mini_batch = memory.sample(batch_size=MINIBATCH_SIZE)
         myAgent.train(mini_batch, global_steps)
+
+    if global_steps % 10000 == 0 and global_steps > 0 and global_steps > (initial_training + 1):
+        print("    training counter...", global_steps)
+        print("")
+        print("** copy Qnetwork w/b --> target network w/b ...")
+        print("")
+        myAgent.copyTargetQNetwork()
+
+    if global_steps % 20000 == 0 and global_steps > 0:
+        myAgent.saver.save(myAgent.sess,"tfmodel/dqnMain",global_step=global_steps)
+        print("**    model saved.. ")
+
 
     return next_image, max_q_value
 

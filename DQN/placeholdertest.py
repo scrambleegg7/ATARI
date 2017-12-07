@@ -130,7 +130,8 @@ with tf.Session() as sess:
     loss_ = sess.run(loss, feed_dict=feed_dict)
     print("** loss ** ",loss_)
     print("global steps", global_step)
-
+    
+    global_step = global_step.eval()
     loss_ = sess.run(loss, feed_dict=feed_dict)
     print("** loss ** ",loss_)
     print("global steps", global_step)

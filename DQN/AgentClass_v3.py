@@ -82,6 +82,7 @@ class AgentClass(object):
         self.train_loop_counter = 0
 
     def getGlobalSteps(self):
+        return self.sess.run(self.global_step)
 
 
     def update_summary(self):
@@ -171,8 +172,6 @@ class AgentClass(object):
         var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
         var_name = {v.name[len(scopemain.name):]:v for v in var}
 
-        print(var_name)
-        # return fc final layer and var
         return y_conv, var, var_name
 
     def checkStateImageShape(self,state):
@@ -182,7 +181,7 @@ class AgentClass(object):
             state = state[np.newaxis,:,:,:]
         return state / 255.0
 
-    def get_action(self,state):
+    def get_action(self,state, global_steps):
 
         state = self.checkStateImageShape(state)
 
@@ -197,7 +196,7 @@ class AgentClass(object):
         #print("q_value from nn...", res)
         action = np.argmax(res[0])
 
-        if self.epsilon > np.random.random():
+        if self.epsilon > np.random.random() and global_steps < 20000:
             action = np.random.randint(0,self.num_actions)
 
         epsilon = self.epsilon_update()
@@ -329,14 +328,14 @@ class AgentClass(object):
 
         self.total_loss += loss
 
-        if global_steps % 10000 == 9999:
-            print("    training counter...", global_steps)
-            print("** copy Qnetwork w/b --> target network w/b ...")
-            self.copyTargetQNetwork()
+        #if global_steps % 10000 == 9999:
+        #    print("    training counter...", global_steps)
+        #    print("** copy Qnetwork w/b --> target network w/b ...")
+        #    self.copyTargetQNetwork()
 
-        if global_steps % 20000 == 19999:
-            self.saver.save(self.sess,"tfmodel/dqnMain",global_step=global_steps)
-            print("    model saved.. ")
+        #if global_steps % 20000 == 19999:
+        #    self.saver.save(self.sess,"tfmodel/dqnMain",global_step=global_steps)
+        #    print("**    model saved.. ")
 
         #for i in range(batch_size):
         #    init_state = states[i]
