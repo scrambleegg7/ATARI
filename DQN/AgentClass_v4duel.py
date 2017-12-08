@@ -29,13 +29,12 @@ class AgentClass(object):
         print("** AgentClass x: ",self.x.get_shape().as_list())
 
         # initialize Q network
-        self.y_q_values , var_q, var_q_name = self.build_Q(STATE_LENGTH)
+        self.q_predict,self.y_q_values,var_q,_ = self.build_Q(STATE_LENGTH)
         # intialize Target Network
-        self.y_target , var_target, var_target_name = self.build_target(STATE_LENGTH)
+        self.target_predict,self.y_target,var_target,_ = self.build_target(STATE_LENGTH)
 
         # loss
         self.loss, self.grad_update,self.global_step = self.build_training_op(self.y_q_values, var_q)
-
 
         #for idx,var in enumerate(var_target[0:total_vars//2]):
         #    op_holder.append(tfVars[idx+total_vars//2].assign((var.value()*tau) + ((1-tau)*tfVars[idx+total_vars//2].value())))
@@ -85,7 +84,6 @@ class AgentClass(object):
     def getGlobalSteps(self):
         return self.sess.run(self.global_step)
 
-
     def update_summary(self):
 
         episode_reward_mean = tf.Variable(.0)
@@ -116,14 +114,14 @@ class AgentClass(object):
 
     def build_Q(self,STATE_LENGTH):
         # Q Network
-        y_conv, q_network_values, q_val_name = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
-        return y_conv, q_network_values, q_val_name
+        y_predict, y_conv, q_network_values, q_val_name = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
+        return y_predict, y_conv, q_network_values, q_val_name
 
     def build_target(self,STATE_LENGTH):
         #Target Network
-        y_target_conv, target_q_val, target_val_name = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
+        y_target_predict, y_target_conv, target_q_val, target_val_name = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
         #target_network_weights = target_network.trainable_weights
-        return y_target_conv, target_q_val,target_val_name
+        return y_target_predict, y_target_conv, target_q_val,target_val_name
 
     def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False,h_size=512):
         # reuse is used to share weight and other values..
@@ -190,16 +188,16 @@ class AgentClass(object):
             self.Value = tf.matmul(self.streamV,self.VW)
 
             #Then combine them together to get our final Q-values.
-            self.Qout = self.Value + tf.subtract(self.Advantage,tf.reduce_mean(self.Advantage,axis=1,keep_dims=True))
-            #self.predict = tf.argmax(self.Qout,1)
+            Qout = self.Value + tf.subtract(self.Advantage,tf.reduce_mean(self.Advantage,axis=1,keep_dims=True))
+            predict = tf.argmax(Qout,1)
 
-            qout_shape = self.Qout.get_shape().as_list()
+            qout_shape = Qout.get_shape().as_list()
             print("Qout shape", scopemain.name, qout_shape)
 
             var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
             var_name = {v.name[len(scopemain.name):]:v for v in var}
 
-        return self.Qout, var, var_name
+        return predict, Qout, var, var_name
 
     def checkStateImageShape(self,state):
 
