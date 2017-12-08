@@ -1,63 +1,101 @@
 #
+
+# simple version to train duel Q network
+
 import tensorflow as tf
-import numypy as np
+import numpy as np
 import pandas as pd
 
-x = tf.placeholder(np.float32, [None, 21168])
+from AgentClass_v4duel import AgentClass
 
-x_image = tf.reshape(x, [-1,84,84,3])
+import tensorflow.contrib.slim as slim
+
+tf.reset_default_graph()
+
+ENV_NAME = 'SpaceInvaders-v0'
+SAVE_NETWORK_PATH = 'saved_networks/' + ENV_NAME
+SAVE_SUMMARY_PATH = 'summary/' + ENV_NAME
+
+env = gym.make(ENV_NAME)
+
+STATE_LENGTH=4
+myAgent = AgentClass(env.action_space.n,STATE_LENGTH)
+
+#
+#parameters
+#
+batch_size = 32 #How many experiences to use for each training step.
+update_freq = 4 #How often to perform a training step.
+y = .99 #Discount factor on the target Q-values
+startE = 1 #Starting chance of random action
+endE = 0.1 #Final chance of random action
+annealing_steps = 10000. #How many steps of training to reduce startE to endE.
+num_episodes = 10000 #How many episodes of game environment to train network with.
+pre_train_steps = 10000 #How many steps of random actions before training begins.
+max_epLength = 50 #The max allowed length of our episode.
+load_model = False #Whether to load a saved model.
+path = "./dqn" #The path to save our model to.
+h_size = 512 #The size of the final convolutional layer before splitting it into Advantage and Value streams.
+tau = 0.001 #Rate to update target network toward primary network
+
+def get_initial_state(observation, last_observation):
+
+    init_image = rgb2gray(observation)
+    init_image = resize(init_image, (84,84),mode="constant")
+    init_image = rescale_intensity(init_image,out_range=(0,255))
+
+    #processed_observation = np.maximum(observation, last_observation)
+    #processed_observation = np.uint8(resize(rgb2gray(last_observation), (84, 84)) * 255)
+    state = [init_image for _ in range(4)]
+    stacked_image = np.stack(state, axis=0)
+
+    #
+    #  one layer equal to one game screen image ...
+    #
+
+    #  layer 0 --> game image (no action)
+    #  layer 1 --> game image (no action)
+    #  layer 2 --> game image (no action)
+    #
+    init_image = np.transpose(stacked_image,(1,2,0))
+    # should be changed W x H x C format
+    return init_image
+
+def preprocess(observation, last_observation):
+    #processed_observation = np.maximum(observation, last_observation)
+    obs_image = rgb2gray(observation)
+    obs_image = resize(obs_image, (84,84),mode="constant")
+    obs_image = rescale_intensity(obs_image,out_range=(0,255))
+
+    return obs_image
 
 
 
-class dueltestclass(object):
+#Set the rate of random action decrease.
+e = startE
+stepDrop = (startE - endE)/annealing_steps
 
-    def __init__(self,test=False):
-        self.test = test
+#create lists to contain total rewards and steps per episode
+jList = []
+rList = []
+total_steps = 0
 
-    def build_network(self,main_name="Q",reuse=False):
-        # reuse is used to share weight and other values..
-
-        with tf.variable_scope(main_name) as scope:
-
-            x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
-
-            name = "conv1"
-            with tf.variable_scope(name) as scope:
-                W_conv1 = self.weight_variable([8, 8, STATE_LENGTH, 32])
-                b_conv1 = self.bias_variable([32])
-                #conv1 = tf.nn.relu(self.conv2d(self.x, W_conv1,[1,4,4,1] ) + b_conv1)
-                conv1 = tf.nn.relu(self.conv2d(x_image, W_conv1,[1,4,4,1] ) + b_conv1)
-
-            name = "conv2"
-            with tf.variable_scope(name) as scope:
-                W_conv2 = self.weight_variable([4, 4, 32, 64],reuse)
-                b_conv2 = self.bias_variable([64],reuse)
-                conv2 = tf.nn.relu(self.conv2d(conv1, W_conv2,[1,2,2,1]) + b_conv2)
-
-            name = "conv3"
-            with tf.variable_scope(name) as scope:
-                W_conv3 = self.weight_variable([3, 3, 64, 64],reuse)
-                b_conv3 = self.bias_variable([64],reuse)
-                conv3 = tf.nn.relu(self.conv2d(conv2, W_conv3,[1,1,1,1]) + b_conv3)
-
-            h_conv3_shape = conv3.get_shape().as_list()
-            #print(h_conv3_shape)
-            #print("dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
-
-            name = "fc1"
-            with tf.variable_scope(name) as scope:
-                W_fc1 = self.weight_variable([7 * 7 * 64, 512],reuse)
-                b_fc1 = self.bias_variable([512],reuse)
-                h_flat = tf.reshape(conv3, [-1, 7*7*64])
-                h_fc1 = tf.nn.relu(tf.matmul(h_flat, W_fc1) + b_fc1)
-
-            name = "fc2"
-            with tf.variable_scope(name) as scope:
-                W_fc2 = self.weight_variable([512, self.num_actions],reuse)
-                b_fc2 = self.bias_variable([self.num_actions],reuse)
-
-                y_conv = tf.matmul(h_fc1, W_fc2) + b_fc2
-
-        var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
-        # return fc final layer and var
-        return y_conv, var
+for i in range(num_episodes):
+        episodeBuffer = experience_buffer()
+        #Reset environment and get first new observation
+        state = env.reset()
+        s = processState(s)
+        d = False
+        rAll = 0
+        j = 0
+        #The Q-Network
+        while j < max_epLength: #If the agent takes longer than 200 moves to reach either of the blocks, end the trial.
+            j+=1
+            #Choose an action by greedily (with e chance of random action) from the Q-network
+            if np.random.rand(1) < e or total_steps < pre_train_steps:
+                a = np.random.randint(0,4)
+            else:
+                a = sess.run(mainQN.predict,feed_dict={mainQN.scalarInput:[s]})[0]
+            s1,r,d = env.step(a)
+            s1 = processState(s1)
+            total_steps += 1
