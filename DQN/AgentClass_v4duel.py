@@ -8,7 +8,7 @@ from collections import deque
 
 INITIAL_EPSILON = 1.0
 FINAL_EPSILON = 0.1  #
-EXPLORATION_STEPS = 1000000  #
+EXPLORATION_STEPS = 10000  #
 
 FRAME_WIDTH = 84
 FRAME_HEIGHT = 84
@@ -17,6 +17,19 @@ FRAME_HEIGHT = 84
 class AgentClass(object):
 
     def __init__(self,num_actions=3,STATE_LENGTH=3,test=False):
+
+        self.x = tf.placeholder( "float", [None, FRAME_WIDTH, FRAME_HEIGHT, STATE_LENGTH ] )
+
+        self.num_actions = num_actions  #
+        self.epsilon = INITIAL_EPSILON  # g
+        self.epsilon_step = (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORATION_STEPS  #
+        self.time_step = 0
+        self.repeated_action = 0
+
+        self.STATE_LENGTH = STATE_LENGTH
+
+
+    def testinit(self,num_actions=3,STATE_LENGTH=3,test=False):
 
         self.num_actions = num_actions  #
         self.epsilon = INITIAL_EPSILON  # g
@@ -63,7 +76,7 @@ class AgentClass(object):
         self.saver = tf.train.Saver()
 
         self.merged = tf.summary.merge_all()
-        self.train_writer = tf.summary.FileWriter('tfmodel/test',
+        self.train_writer = tf.summary.FileWriter('tfmodel/duelagent04',
                                       self.sess.graph)
 
         sess_var_q = self.sess.run(var_q)
@@ -119,9 +132,9 @@ class AgentClass(object):
 
     def build_target(self,STATE_LENGTH):
         #Target Network
-        y_target_predict, y_target_conv, target_q_val, target_val_name = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
+        y_target_predict, y_target_q, target_q_val, target_valname = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
         #target_network_weights = target_network.trainable_weights
-        return y_target_predict, y_target_conv, target_q_val,target_val_name
+        return y_target_predict, y_target_q, target_q_val, target_valname
 
     def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False,h_size=512):
         # reuse is used to share weight and other values..
@@ -157,8 +170,8 @@ class AgentClass(object):
                 conv4 = tf.nn.relu(self.conv2d(conv3, W_conv4,[1,1,1,1]) + b_conv4)
 
             h_conv4_shape = conv4.get_shape().as_list()
-            print(h_conv4_shape)
-            print("conv4 dimension:",h_conv4_shape[1],h_conv4_shape[2],h_conv4_shape[3])
+            #print(h_conv4_shape)
+            #print("conv4 dimension:",h_conv4_shape[1],h_conv4_shape[2],h_conv4_shape[3])
 
             self.streamAC,self.streamVC = tf.split(conv4,2,3)
 
@@ -192,12 +205,12 @@ class AgentClass(object):
             predict = tf.argmax(Qout,1)
 
             qout_shape = Qout.get_shape().as_list()
-            print("Qout shape", scopemain.name, qout_shape)
+            #print("Qout shape", scopemain.name, qout_shape)
 
-            var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
-            var_name = {v.name[len(scopemain.name):]:v for v in var}
+            trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
+            trainable_varname_dict = {v.name[len(scopemain.name)+1:]:v for v in trainable_var}
 
-        return predict, Qout, var, var_name
+        return predict, Qout, trainable_var, trainable_varname_dict
 
     def checkStateImageShape(self,state):
 
