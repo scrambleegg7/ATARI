@@ -127,14 +127,14 @@ class AgentClass(object):
 
     def build_Q(self,STATE_LENGTH):
         # Q Network
-        y_predict, y_conv, q_network_values, q_val_name = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
-        return y_predict, y_conv, q_network_values, q_val_name
+        y_conv, q_val_name = self.build_network(main_name="Qnet",STATE_LENGTH=STATE_LENGTH)
+        return y_conv, q_val_name
 
     def build_target(self,STATE_LENGTH):
         #Target Network
-        y_target_predict, y_target_q, target_q_val, target_valname = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
+        y_target_q, target_valname = self.build_network(main_name="target",STATE_LENGTH=STATE_LENGTH)
         #target_network_weights = target_network.trainable_weights
-        return y_target_predict, y_target_q, target_q_val, target_valname
+        return y_target_q, target_valname
 
     def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False,h_size=512):
         # reuse is used to share weight and other values..
@@ -210,7 +210,7 @@ class AgentClass(object):
             trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
             trainable_varname_dict = {v.name[len(scopemain.name)+1:]:v for v in trainable_var}
 
-        return predict, Qout, trainable_var, trainable_varname_dict
+        return Qout, trainable_varname_dict
 
     def checkStateImageShape(self,state):
 

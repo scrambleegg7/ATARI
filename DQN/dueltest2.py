@@ -53,9 +53,9 @@ tau = 0.001 #Rate to update target network toward primary network
 
 
 
-q_predict,y_q_values,var_q, var_q_name = myAgent.build_Q(STATE_LENGTH)
+y_q_values, var_q_name = myAgent.build_Q(STATE_LENGTH)
 
-target_predict,y_q_target,var_q_targets,var_targets = myAgent.build_target(STATE_LENGTH)
+y_q_target, var_targets = myAgent.build_target(STATE_LENGTH)
 
 tau = .001
 # We need an operation to copy the online DQN to the target DQN
@@ -94,7 +94,7 @@ init = tf.global_variables_initializer()
 saver = tf.train.Saver()
 
 # Let's implement a simple replay memory
-memory = Memory(max_size  = (pre_train_steps * 2)
+memory = Memory(max_size  = pre_train_steps * 2 )
 
 mspacman_color = np.array([210, 164, 74]).mean()
 
@@ -143,12 +143,19 @@ init_op = tf.group(tf.global_variables_initializer(),
                tf.local_variables_initializer())
 sess.run(init_op)
 
-num_episodes = 50
-memory_sptes = 0
+sess.run( copy_online_to_target )
+
+
+num_episodes = 30
+iteration_steps = 0
+
+learn_iterations = 4
+MINIBATCH_SIZE = 32
+
+
 
 eps_min = 0.1
 eps_max = 1.0
-
 
 
 for e in range( num_episodes ):
@@ -158,32 +165,93 @@ for e in range( num_episodes ):
         last_observation = observation
         observation, reward, done, info = env.step(0)
 
-    print("** initial state image ...")
+    #print("** initial state image ...")
     state_image = get_initial_state(observation, last_observation)
 
     loop_steps = 0
     episode_reward = 0
+    total_max_q = 0
+    episode_loss = []
+
     while not done:
 
-        if memory_sptes < pre_train_steps:
+        q_values = sess.run(y_q_values,feed_dict={myAgent.x: [state_image]})
+
+        if iteration_steps < pre_train_steps:
             epsilon = max(eps_min, myAgent.epsilon)
             if np.random.rand() < epsilon:
                 action = np.random.randint(env.action_space.n) # random action
         else:
-            action, q_values = sess.run([q_predict,y_q_values],feed_dict={myAgent.x: [state_image]})
+            action = np.argmax(q_values)
 
-        memory_sptes += 1
+
+        iteration_steps += 1
         loop_steps += 1
 
+        # get observation reward done with 
+        # 1 action based on random 
+        # 2 action reviewed by state_image (if memory )
         observation, reward, done, info = env.step(action)
         episode_reward += reward
+
         processed_image = preprocess(observation, last_observation)
 
+        next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
+        state_image /= 255.0
+        next_image /= 255.0
+        memory.add((state_image, action, reward, done, next_image))
+
+        state_image = next_image
+
+        total_max_q += np.max(q_values)
+
         if done:
-            print("episode : %d" % (e + 1))
-            print("average reward %.5f" % (episode_reward / loop_steps)   )
-            print("memory steps : %d" % memory_sptes)
-            next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
-            state_image /= 255.0
-            next_image /= 255.0
-            memory.add((state_image, action, reward, done, next_image))
+            print("** episode : %d done ..." % (e + 1))
+            
+        if iteration_steps < pre_train_steps or \
+            iteration_steps % learn_iterations != 0:
+            continue
+
+        # training part 
+        # every 32 data size ....
+
+        mini_batch = memory.sample(batch_size=MINIBATCH_SIZE)
+
+        DECAY_RATE = .99
+        states = np.array([each[0] for each in mini_batch])
+        actions = np.array([each[1] for each in mini_batch])
+        rewards = np.array([each[2] for each in mini_batch])
+        dones = np.array([each[3] for each in mini_batch])
+        next_states = np.array([each[4] for each in mini_batch])
+
+        next_q_values = sess.run( y_q_target, \
+                feed_dict={myAgent.x: next_states})
+        max_next_q_values = np.max(next_q_values, axis=1)
+        
+        y_val = rewards + (1 - dones) * DECAY_RATE * max_next_q_values
+        y_val = y_val[:,np.newaxis]
+        #print(rewards.shape)
+        #print(dones.shape)
+        #print(next_q_values.shape)
+        #print(max_next_q_values.shape)
+        #print(y_val.shape)
+        #print(actions.shape)
+        #print(states.shape)
+
+        loss_feed_dict = {myAgent.x:states,X_action:actions,y: y_val}
+        _, loss_val = sess.run([training_op, loss], feed_dict=loss_feed_dict)
+        episode_loss.append( loss_val )
+
+        copy_steps = 10000
+        if iteration_steps % copy_steps == 0:
+            print(" * copy weight of q --> target weight ... *")
+            sess.run( copy_online_to_target )
+        
+    print("   average reward %.5f" % (episode_reward / loop_steps)   )
+    print("   iteration steps : %d" % iteration_steps)
+    print("   max Q %.4f" % ( total_max_q / loop_steps) )
+    print("   loop steps : %d" % loop_steps)
+    print("   Avg.loss %.7f" % np.mean(episode_loss ) )
+    print("   total loss %.7f" % np.sum(episode_loss) )
+
+    #print(q_values)
