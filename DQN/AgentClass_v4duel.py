@@ -136,12 +136,12 @@ class AgentClass(object):
         #target_network_weights = target_network.trainable_weights
         return y_target_q, target_valname
 
-    def build_network(self,main_name="Q",STATE_LENGTH=3,reuse=False,h_size=512):
+    def build_network(self,x_image,main_name="Q",STATE_LENGTH=3,reuse=False,h_size=512):
         # reuse is used to share weight and other values..
 
         with tf.variable_scope(main_name) as scopemain:
 
-            x_image = self.x
+            #x_image = self.x
             #x_image = tf.reshape(self.x, [-1, 84, 84, STATE_LENGTH])
 
             name = "conv1"
@@ -163,6 +163,10 @@ class AgentClass(object):
                 b_conv3 = self.bias_variable([64],reuse)
                 conv3 = tf.nn.relu(self.conv2d(conv2, W_conv3,[1,1,1,1]) + b_conv3)
 
+            h_conv3_shape = conv3.get_shape().as_list()
+            print(h_conv3_shape)
+            print(" **conv3 dimension:",h_conv3_shape[1],h_conv3_shape[2],h_conv3_shape[3])
+
             name = "conv4"
             with tf.variable_scope(name) as scopev4:
                 W_conv4 = self.weight_variable([7, 7, 64, 512],reuse)
@@ -170,8 +174,8 @@ class AgentClass(object):
                 conv4 = tf.nn.relu(self.conv2d(conv3, W_conv4,[1,1,1,1]) + b_conv4)
 
             h_conv4_shape = conv4.get_shape().as_list()
-            #print(h_conv4_shape)
-            #print("conv4 dimension:",h_conv4_shape[1],h_conv4_shape[2],h_conv4_shape[3])
+            print(h_conv4_shape)
+            print(" ** conv4 dimension:",h_conv4_shape[1],h_conv4_shape[2],h_conv4_shape[3])
 
             self.streamAC,self.streamVC = tf.split(conv4,2,3)
 
@@ -208,9 +212,9 @@ class AgentClass(object):
             #print("Qout shape", scopemain.name, qout_shape)
 
             trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,main_name)
-            trainable_varname_dict = {v.name[len(scopemain.name)+1:]:v for v in trainable_var}
+            trainable_vars_by_name = {v.name[len(scopemain.name)+1:]:v for v in trainable_var}
 
-        return Qout, trainable_varname_dict
+        return Qout, trainable_vars_by_name
 
     def checkStateImageShape(self,state):
 

@@ -1,5 +1,13 @@
 from __future__ import division, print_function, unicode_literals
 
+
+#
+# game image frame is processed one by one to insert memory stack. 
+# then training is started after stack images are stored over 10000 frames.
+# 
+# training is processed per 4 frame so that batch process are activated.  
+# 
+
 # Handle arguments (before slow imports so --help can be fast)
 import argparse
 parser = argparse.ArgumentParser(
@@ -14,7 +22,7 @@ parser.add_argument("-c", "--copy-steps", type=int, default=10000,
     help="number of training steps between copies of online DQN to target DQN")
 parser.add_argument("-r", "--render", action="store_true", default=False,
     help="render the game during training or testing")
-parser.add_argument("-p", "--path", default="./my_dqn.ckpt",
+parser.add_argument("-p", "--path", default="./tfmodel/my_dqn.ckpt",
     help="path of the checkpoint file")
 parser.add_argument("-t", "--test", action="store_true", default=False,
     help="test (no learning and minimal epsilon)")
@@ -28,6 +36,11 @@ import numpy as np
 import os
 import tensorflow as tf
 
+from AgentClass_v4duel import AgentClass
+
+from skimage.transform import resize
+from skimage.color import rgb2gray
+from skimage.exposure import rescale_intensity
 
 
 env = gym.make("MsPacman-v0")
@@ -48,6 +61,9 @@ hidden_activation = tf.nn.relu
 n_outputs = env.action_space.n  # 9 discrete actions are available
 initializer = tf.contrib.layers.variance_scaling_initializer()
 
+myDuelAgent = AgentClass(num_actions=n_outputs, STATE_LENGTH=1)
+
+
 def q_network(X_state, name):
     prev_layer = X_state
     with tf.variable_scope(name) as scope:
@@ -58,6 +74,13 @@ def q_network(X_state, name):
                 prev_layer, filters=n_maps, kernel_size=kernel_size,
                 strides=strides, padding=padding, activation=activation,
                 kernel_initializer=initializer)
+
+            prev_shape = prev_layer.get_shape().as_list()
+            h,w,d = prev_shape[1],prev_shape[2],prev_shape[3]
+            print("* layer shape ...", h,w,d)    
+
+        n_hidden_in = h * w * d
+
         last_conv_layer_flat = tf.reshape(prev_layer, shape=[-1, n_hidden_in])
         hidden = tf.layers.dense(last_conv_layer_flat, n_hidden,
                                  activation=hidden_activation,
@@ -70,14 +93,18 @@ def q_network(X_state, name):
                               for var in trainable_vars}
     return outputs, trainable_vars_by_name
 
-
-
-
-
+# put serial 4 images into one image 
+input_height = 84
+input_width = 84
+#input_channels = 4
 X_state = tf.placeholder(tf.float32, shape=[None, input_height, input_width,
                                             input_channels])
-online_q_values, online_vars = q_network(X_state, name="q_networks/online")
-target_q_values, target_vars = q_network(X_state, name="q_networks/target")
+
+online_q_values, online_vars = myDuelAgent.build_network(X_state, main_name="q_networks/online", STATE_LENGTH=1)
+target_q_values, target_vars = myDuelAgent.build_network(X_state, main_name="q_networks/target", STATE_LENGTH=1)
+
+#online_q_values, online_vars = q_network(X_state, name="q_networks/online")
+#target_q_values, target_vars = q_network(X_state, name="q_networks/target")
 
 # We need an operation to copy the online DQN to the target DQN
 copy_ops = [target_var.assign(online_vars[var_name])
@@ -136,7 +163,58 @@ def epsilon_greedy(q_values, step):
 # We need to preprocess the images to speed up training
 mspacman_color = np.array([210, 164, 74]).mean()
 
-def preprocess_observation(obs):
+
+def get_initial_state(observation): #, last_observation):
+
+    init_image = rgb2gray(observation)
+    init_image = resize(init_image, (84,84),mode="constant")
+    init_image = rescale_intensity(init_image,out_range=(0,255))
+
+    #processed_observation = np.maximum(observation, last_observation)
+    #processed_observation = np.uint8(resize(rgb2gray(last_observation), (84, 84)) * 255)
+    state = [init_image for _ in range(4)]
+    stacked_image = np.stack(state, axis=0)
+
+    #
+    #  one layer equal to one game screen image ...
+    #
+
+    #  layer 0 --> game image (no action)
+    #  layer 1 --> game image (no action)
+    #  layer 2 --> game image (no action)
+    #
+    init_image = np.transpose(stacked_image,(1,2,0))
+    init_image /= 255.0
+
+    # should be changed W x H x C format
+    return init_image
+
+def preprocess_observation(observation):
+    #processed_observation = np.maximum(observation, last_observation)
+    obs_image = rgb2gray(observation)
+    obs_image = resize(obs_image, (84,84),mode="constant")
+    obs_image = rescale_intensity(obs_image,out_range=(0,255))
+    obs_image /= 255.0
+
+
+
+    # shape is 84 x 84
+    return obs_image.reshape(input_height, input_width,1)
+    #return np.reshape(processed_observation, (1, FRAME_WIDTH, FRAME_HEIGHT))
+
+
+def preprocess_observation2(observation):
+    #processed_observation = np.maximum(observation, last_observation)
+    obs_image = rgb2gray(observation)
+    obs_image = resize(obs_image, (84,84),mode="constant")
+    obs_image = rescale_intensity(obs_image,out_range=(0,255))
+    obs_image /= 255.0
+    #obs_image = obs_image[:,:,np.newaxis]
+    # shape is 84 x 84
+    return obs_image
+    #return np.reshape(processed_observation, (1, FRAME_WIDTH, FRAME_HEIGHT))
+
+def preprocess_observation_old(obs):
     img = obs[1:176:2, ::2] # crop and downsize
     img = img.mean(axis=2) # to greyscale
     img[img==mspacman_color] = 0 # Improve contrast
@@ -162,11 +240,20 @@ global_reward = 0
 total_rewards = []
 
 with tf.Session() as sess:
-    if os.path.isfile(args.path + ".index"):
-        saver.restore(sess, args.path)
-    else:
-        init.run()
-        copy_online_to_target.run()
+    #if os.path.isfile(args.path + ".index"):
+    #    saver.restore(sess, args.path)
+    #else:
+    init.run()
+    copy_online_to_target.run()
+
+    #observation = env.reset()
+    #for _ in range(np.random.randint(1,10)):
+    #    last_observation = observation
+    #    observation, reward, done, info = env.step(0)
+
+    #print("** initial state image ...")
+    #state_image = get_initial_state(observation)
+
     while True:
         step = global_step.eval()
         if step >= args.number_steps:
@@ -178,14 +265,26 @@ with tf.Session() as sess:
                     "Loss {:5f}    Mean Max-Q {:5f}   ".format(
                     iteration, step, args.number_steps, step * 100 / args.number_steps,
                     loss_val, mean_max_q), end="")
+
+
+
+
+
         if done: # game over, start again
             obs = env.reset()
             print("game over...")
             print("iter {} Reward {} ".format(iteration, global_reward) )
-            for skip in range(skip_start): # skip the start of each game
-                obs, reward, done, info = env.step(0)
-            state = preprocess_observation(obs)
 
+            #for skip in range(skip_start): # skip the start of each game
+            #    obs, reward, done, info = env.step(0)
+
+            #for _ in range(np.random.randint(1,10)):
+            #    last_observation = observation
+            #    observation, reward, done, info = env.step(0)
+
+            # state_image = get_initial_state(observation)
+
+            state_image = preprocess_observation(obs)
             total_rewards.append( global_reward )
 
             global_reward = 0
@@ -194,18 +293,19 @@ with tf.Session() as sess:
             env.render()
 
         # Online DQN evaluates what to do
-        q_values = online_q_values.eval(feed_dict={X_state: [state]})
+        q_values = online_q_values.eval(feed_dict={X_state: [state_image]})
         action = epsilon_greedy(q_values, step)
 
         # Online DQN plays
         obs, reward, done, info = env.step(action)
-        next_state = preprocess_observation(obs)
-        
+        next_image = preprocess_observation(obs)
+        #next_image = np.append(state_image[:, :, 1:], processed_image[:,:,np.newaxis], axis=2)
+
         global_reward += reward 
 
         # Let's memorize what happened
-        replay_memory.append((state, action, reward, next_state, 1.0 - done))
-        state = next_state
+        replay_memory.append((state_image, action, reward, next_image, 1.0 - done))
+        state_image = next_image
 
         if args.test:
             continue
@@ -241,12 +341,12 @@ with tf.Session() as sess:
             X_state: X_state_val, X_action: X_action_val, y: y_val})
 
         # Regularly copy the online DQN to the target DQN
-        if step % args.copy_steps == 0:
-            print("* online to target weight....")
+        if iteration % args.copy_steps == 0:
+            print("* online to target weight on iter counter ....", iteration)
             copy_online_to_target.run()
 
         # And save regularly
-        if step % args.save_steps == 0:
+        if iteration % args.save_steps == 0:
             saver.save(sess, args.path)
     
     print("average rewards before training every episode ....") 
