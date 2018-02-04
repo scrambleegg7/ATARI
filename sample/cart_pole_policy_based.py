@@ -20,11 +20,20 @@ def discount_rewards(r):
     """ take 1D float array of rewards and compute discounted reward """
     discounted_r = np.zeros_like(r)
     running_add = 0
-    for t in reversed(xrange(0, r.size)):
+    for t in reversed(range(r.size)):
         running_add = running_add * gamma + r[t]
         discounted_r[t] = running_add
     return discounted_r
 
+def weight_variable(shape):
+    W = tf.get_variable("W", shape=shape,
+           initializer=tf.contrib.layers.xavier_initializer())
+    return W
+
+def bias_variable(shape):
+    initial_value = tf.truncated_normal(shape, 0.0, 0.001)
+    b = tf.get_variable("b",initializer=initial_value)
+    return b
 
 
 class agent():
@@ -32,9 +41,34 @@ class agent():
         #These lines established the feed-forward part of the network. The agent takes a state and produces an action.
         self.state_in= tf.placeholder(shape=[None,s_size],dtype=tf.float32)
 
-        hidden = slim.fully_connected(self.state_in,h_size,biases_initializer=None,activation_fn=tf.nn.relu)
+        name = "fully_connected_model"
+        with tf.variable_scope(name) as scope:
 
-        self.output = slim.fully_connected(hidden,a_size,activation_fn=tf.nn.softmax,biases_initializer=None)
+            name = "layer1"
+            with tf.variable_scope(name) as scope:
+
+                w1_shape = [s_size,h_size]
+                W1 = weight_variable(shape=w1_shape)
+                b1 = bias_variable([h_size])
+                hidden = tf.nn.relu(  tf.matmul(self.state_in,W1) + b1 )
+
+                w1_smry = tf.summary.histogram("W1", W1)
+
+            name = "layer2"
+            with tf.variable_scope(name) as scope:
+
+                w2_shape = [h_size,a_size]
+                W2 = weight_variable(shape=w2_shape)
+                b2 = bias_variable(shape=[a_size])
+
+                w2_smry = tf.summary.histogram("W2", W2)
+
+        self.output = tf.nn.softmax(  tf.matmul(hidden,W2) + b2 )
+
+
+
+        #hidden = slim.fully_connected(self.state_in,h_size,biases_initializer=None,activation_fn=tf.nn.relu)
+        #self.output = slim.fully_connected(hidden,a_size,activation_fn=tf.nn.softmax,biases_initializer=None)
 
         self.chosen_action = tf.argmax(self.output,1)
 
@@ -101,11 +135,7 @@ class contextual_bandit():
 # within which each value is an estimate of the value of the return from choosing a particular arm given a bandit.
 # We use a policy gradient method to update the agent by moving the value for the selected action toward the recieved reward.
 
-env = gym.make('CartPole-v0')
-
-
-tf.reset_default_graph() #Clear the Tensorflow graph.
-
+#env = gym.make('CartPole-v0')
 
 tf.reset_default_graph() #Clear the Tensorflow graph.
 
