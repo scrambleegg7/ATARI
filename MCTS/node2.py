@@ -38,6 +38,10 @@ class Node():
             print("Sorry, but Node fully expanded ..... (Node)")
             return True
 
+        if self.state.opposit_predict_win:
+            print("opposit_predict_win ....")
+            return True
+
         return False
     def __repr__(self):
         s="Node; children: %d; visits: %d; reward: %f state: %s; parent %s"%(len(self.children),self.visits,self.reward, self.state, self.parent)

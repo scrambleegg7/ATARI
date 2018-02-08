@@ -4,8 +4,11 @@ import math
 import logging
 import hashlib
 
-from uct import UCTSEARCH
-from node import Node
+from node2 import Node
+
+from tictactoe_uct import UCTSEARCH
+from GameState2 import GameState2
+from Board import Board
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('GameState')
@@ -53,7 +56,7 @@ class huPlayer(Player):
 
     def __init__(self,first=True):
         super(huPlayer, self).__init__(first)
-        self.piece = "X"
+        self.piece = "O"
 
 
     def randomPlay(self,board):
@@ -78,7 +81,7 @@ class aiPlayer(Player):
 
     def __init__(self,first=False):
         super(aiPlayer,self).__init__(first)
-        self.piece = "O"
+        self.piece = "X"
 
     def playerMove(self):
         pass
@@ -100,14 +103,15 @@ class aiPlayer(Player):
             pass
 
 
-class GameState(object):
+class GameController(object):
 
-    def __init__(self, board = [' '] * 10,turn = 0, next_turn=0):
+    def __init__(self, board = np.array([' '] * 10), next_turn=0):
 
         self.board = board
-        self.turn = turn
+        self.turn = 0
         self.next_turn = next_turn
         self.num_moves = 10
+        self.moves = []
 
     def getBoard(self):
 
@@ -134,89 +138,96 @@ class GameState(object):
         s="CurrentState ...: turn %d"%(self.turn)
         return s
 
-    def reward(self, le):
-    # Given a board and a player’s letter, this function returns True if that player has won.
-    # We use bo instead of board and le instead of letter so we don’t have to type as much.
-        r = self.isWin(le)
-        if r:
-            return 10
-        else:
-            return -10
-
-
     def terminal(self):
 
         if isWin(self.board,self.aiPlayer.piece):
+            print("AI WIN....")
             return True
         elif isWin(self.board,self.huPlayer.piece):
+            print("Human WIN....")
             return True
         elif self.turn == NUM_TURNS:
             return True
         else:
-            print("sorry no winner from terminal..")
+            #print("sorry no winner from terminal..")
             return False
 
     def aiPlayerAction(self):
-        move = self.aiPlayer.randomPlay(self.board)
+
+        board_array = self.board
+        myBoard = Board(board=board_array)
+
+        #current_node = Node(GameState2(moves=self.moves, board=myBoard, turn=self.turn, next_turn=0,test=True))
+        current_node = Node(GameState2(moves=self.moves, board=myBoard,turn=self.turn, next_turn="a"))
+
+        for l in range(9 - self.turn):
+            uctClass = UCTSEARCH(100/(l+1),current_node)
+            current_node = uctClass.getCurrent_Node()
+
+            print("Num Children: %d"%len(current_node.children))
+            for i,c in enumerate(current_node.children):
+            	print(i,c)
+            print("Best Child: %s"%current_node.state)
+            print("--------------------------------")
+
+            best_state = current_node.state
+            move = best_state.moves[ self.turn ]
+
+        self.moves.append(move)
         piece = self.aiPlayer.piece
         self.makeMove(move,piece)
-        #print(move)
+
 
     def huPlayerAction(self): # from human player with manual entry with number...
         move = self.huPlayer.randomPlay(self.board)
+        self.moves.append(move)
         piece = self.huPlayer.piece
         self.makeMove(move,piece)
 
 
     def huPlayerActionManual(self): # from human player with manual entry with number...
         move = self.huPlayer.getPlayerMove(self.board)
+        self.moves.append(move)
         piece = self.huPlayer.piece
         self.makeMove(move,piece)
-
-    def next_state_simulation(self):
-
-        if self.next_turn == 0:
-            self.aiPlayerAction()
-            self.next_turn = 1
-        else:
-            self.huPlayerAction()
-            self.next_turn = 0
-
-        self.turn += 1
-
-        next = GameState(self.board,turn=1)
-        return next
-
-    def next_state(self):
-
-        if self.aiPlayer.first:
-            self.aiPlayerAction()
-            #print(self)
-            self.huPlayerAction()
-            #print(self)
-        else:
-            self.huPlayerAction()
-            #print(self)
-            self.aiPlayerAction()
-            #print(self)
-
-        logging.info("currnet board for ai...%s ",self.board)
-
-        next = GameState(self.board)
-        return next
 
     def next_state_manual(self):
 
         if self.aiPlayer.first:
             self.aiPlayerAction()
+            self.turn += 1
             print(self)
-            self.huPlayerAction()
+            print(self.board)
+            print(self.moves)
+            if self.terminal():
+                return True
+
+            self.huPlayerActionManual()
+            self.turn += 1
             print(self)
+            print(self.board)
+            print(self.moves)
+            if self.terminal():
+                return True
+
         else:
-            self.huPlayerAction()
+            self.huPlayerActionManual()
+            self.turn += 1
             print(self)
+            print(self.board)
+            print(self.moves)
+            if self.terminal():
+                return True
+
             self.aiPlayerAction()
+            self.turn += 1
             print(self)
+            print(self.board)
+            print(self.moves)
+            if self.terminal():
+                return True
+
+        return False
 
         logging.info("currnet board for ai...%s ",self.board)
 
@@ -233,38 +244,21 @@ class GameState(object):
             print("** human first turn.....")
             self.next_turn = 0
 
-    def __hash__(self):
-
-	       return int(hashlib.md5(str(self.current)).hexdigest(),16)
-
-    def __eq__(self,other):
-    	if hash(self)==hash(other):
-    	    return True
-    	return False
-
-
 
 def main():
 
-    print("## Game Logic .. for MCTS ...")
 
-    gs = GameState()
+    gs = GameController()
     gs.firstTurn() # decide which turn place piece first
 
-    num_sims = 100
-    myGamePlay = True
+    for l in range(NUM_TURNS-1):
+        logging.info("turn : %d", l)
+        win_lose = gs.next_state_manual()
 
-    #while myGamePlay:
+        if win_lose:
+            break
 
-
-    current_node = Node(gs)
-
-    for l in range(NUM_TURNS):
-        logging.info("LEVEL : %d", l)
-        #gs.next_state()
-
-
-        current_node=UCTSEARCH(num_sims/(l+1),current_node)
+        #current_node=UCTSEARCH(num_sims/(l+1),current_node)
 
 
 if __name__ == "__main__":

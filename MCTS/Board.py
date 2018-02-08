@@ -9,7 +9,7 @@ import numpy as np
 
 class Board(object):
     def __init__(self, board=np.array( [" "] * 10 )):
-        self.board = board
+        self.board = board # board is numpy array
 
     def update(self,move,piece):
         self.board[move] = piece
@@ -21,8 +21,8 @@ class Board(object):
         else:
             return False
 
-    def copy(self):
-        return self.copy()
+    def board_copy(self):
+        return self.board.copy()
 
     def isfilled(self):
         space = np.where(self.board == " ")[0]

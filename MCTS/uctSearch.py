@@ -15,6 +15,8 @@ from logging import Formatter
 import logging
 from logClass import MyHandler
 
+import networkx as nx
+
 logger = getLogger(__name__)
 handler = StreamHandler()
 handler.setLevel(DEBUG)
@@ -51,7 +53,7 @@ class UCTSEARCH(object):
             reward = self.defaultPolicy(front.state)
             self.backup(front,reward)
 
-        return self.BESTCHILD(root,1)
+        return self.BESTCHILD(root,SCALAR)
 
     def treePolicy(self,node):
 
@@ -119,7 +121,7 @@ class UCTSEARCH(object):
 
     def EXPAND(self, node):
 
-        print("EXPAND .....")
+        print("EXPAND .....(add child on new node.)")
         node_child_length = len(node.children)
         self.log.warning("node children length (EXPAND) %d", node_child_length)
 
@@ -149,6 +151,7 @@ class UCTSEARCH(object):
             print("   node visits %d  child visits %d" % ( node.visits, c.visits) )
             print("   exploit %.4f  explore %.4f" % (exploit, explore))
             print("   child move history.", c.state.moves)
+            print("   child next turn.", c.state.next_turn)
 
             if score==bestscore:
                 bestchildren.append(c)
@@ -207,8 +210,8 @@ def GameStartS0():
 
     myBoard = Board(board=board_array)
 
-    current_node = Node(GameState2(moves=[3, 2, 7, 5], board=myBoard,turn=4, next_turn=0,test=True))
-    uctClass = UCTSEARCH(10,current_node)
+    current_node = Node(GameState2(moves=[3, 2, 7, 5], board=myBoard,turn=4, next_turn="a"))
+    uctClass = UCTSEARCH(100,current_node)
     current_node = uctClass.getCurrent_Node()
 
     print("Num Children: %d"%len(current_node.children))
