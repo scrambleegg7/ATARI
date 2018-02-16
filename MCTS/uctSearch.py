@@ -1,54 +1,39 @@
 #
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 from node2 import Node
-
 from Board import Board
 from GameState2 import GameState2
-
-from state import State
-
-
-from logging import getLogger, StreamHandler, DEBUG
-from logging import Formatter
-import logging
-from logClass import MyHandler
-
 import networkx as nx
 
-logger = getLogger(__name__)
-handler = StreamHandler()
-handler.setLevel(DEBUG)
-logger.setLevel(DEBUG)
-logger.addHandler(handler)
-
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.propagate = False
+from ATARI.MCTS import get_module_logger
 
 SCALAR = 1. / np.sqrt(2)
+
+
+mylogger = get_module_logger(__name__)
 
 
 class UCTSEARCH(object):
 
     def __init__(self,budget, root):
-        self.log = getLogger("UCTSEARCH")
         self.current_node = self.process(budget, root)
 
-    def __del__(self):
-        root = self.log
-        map(root.removeHandler, root.handlers[:])
-        map(root.removeFilter, root.filters[:])
+    #def __del__(self):
+        #root = mylogger
+        #map(root.removeHandler, root.handlers[:])
+        #map(root.removeFilter, root.filters[:])
 
     def getCurrent_Node(self):
         return self.current_node
 
     def process(self, budget, root):
 
-        self.log.warning("** UCTSEARCH budget. (UCTSEARCH Class) : %d", budget)
+        mylogger.debug("** UCTSEARCH budget. (UCTSEARCH Class) : %d", budget)
         for i in range(int(budget)):
-            self.log.warning("**** budget range. (UCTSEARCH Class) : [ %d ]" % i )
+            mylogger.debug("**** budget range. (UCTSEARCH Class) : [ %d ]" % i )
             front  = self.treePolicy(root)
             reward = self.defaultPolicy(front.state)
             self.backup(front,reward)
@@ -64,16 +49,16 @@ class UCTSEARCH(object):
                 return self.EXPAND(node)
             elif random.uniform(0,1)<.5:
 
-                print("pickup BEST CHILD with probability less than50%.." )
+                mylogger.debug("pickup BEST CHILD with probability less than50%.." )
                 node=self.BESTCHILD(node,SCALAR)
 
             else:
                 if node.fully_expanded()==False:
-                    print("Check fully expanded..")
+                    mylogger.debug("Check fully expanded..")
                     return self.EXPAND(node)
 
                 else:
-                    print("pickup BEST CHILD with probability than 50%.." )
+                    mylogger.debug("pickup BEST CHILD with probability than 50%.." )
                     node=self.BESTCHILD(node,SCALAR)
 
         return node
@@ -87,16 +72,16 @@ class UCTSEARCH(object):
                 return self.EXPAND(node)
             elif random.uniform(0,1)<.5:
 
-                print("pickup BEST CHILD with probability less than50%.." )
+                mylogger.debug("pickup BEST CHILD with probability less than50%.." )
                 node=self.BESTCHILD(node,SCALAR)
 
             else:
                 if node.fully_expanded()==False:
-                    print("Check fully expanded..")
+                    mylogger.debug("Check fully expanded..")
                     return self.EXPAND(node)
 
                 else:
-                    print("pickup BEST CHILD with probability than 50%.." )
+                    mylogger.debug("pickup BEST CHILD with probability than 50%.." )
                     node=self.BESTCHILD(node,SCALAR)
 
         return node
@@ -110,20 +95,21 @@ class UCTSEARCH(object):
                 break
             state=state.next_state()
 
-            print("DEFAULTPOLICY state..",state)
+            mylogger.debug("DEFAULTPOLICY state..%s ",state)
 
             loop_cnt += 1
 
         r = state.reward()
-        print("**  reward  ** ", r)
+        mylogger.debug("**  reward  ** %.1f ", r)
 
         return r
 
     def EXPAND(self, node):
 
-        print("EXPAND .....(add child on new node.)")
+        mylogger.debug("EXPAND .....(add child on new node.)")
         node_child_length = len(node.children)
-        self.log.warning("node children length (EXPAND) %d", node_child_length)
+        mylogger.debug("node children length (EXPAND) %d", node_child_length)
+        mylogger.debug("recoreded move of Node %s", node.state.moves  )
 
         tried_children=[c.state for c in node.children]
         new_state=node.state.next_state()
@@ -131,7 +117,7 @@ class UCTSEARCH(object):
 
             new_state=node.state.next_state()
 
-        print(new_state)
+        mylogger.debug(new_state)
 
         node.add_child(new_state)
         return node.children[-1]
@@ -147,11 +133,11 @@ class UCTSEARCH(object):
 
             score=exploit+scalar*explore
 
-            print("%d Child score (BESTCHILD) : %.4f" % (idx,score)  )
-            print("   node visits %d  child visits %d" % ( node.visits, c.visits) )
-            print("   exploit %.4f  explore %.4f" % (exploit, explore))
-            print("   child move history.", c.state.moves)
-            print("   child next turn.", c.state.next_turn)
+            mylogger.debug("%d Child score (BESTCHILD) : %.4f" , idx,score  )
+            mylogger.debug("   node visits %d  child visits %d" , node.visits, c.visits )
+            mylogger.debug("   exploit %.4f  explore %.4f" , exploit, explore)
+            mylogger.debug("   child move history. %s", c.state.moves)
+            mylogger.debug("   child next turn. %s", c.state.next_turn)
 
             if score==bestscore:
                 bestchildren.append(c)
@@ -162,8 +148,7 @@ class UCTSEARCH(object):
                 bestscore=score
 
         if len(bestchildren) == 0:
-            print("## sorry, NO CHILDREN  ERROR ! ##")
-
+            mylogger.debug("## sorry, NO CHILDREN  ERROR ! ##")
 
         return random.choice(bestchildren)
 
@@ -175,29 +160,22 @@ class UCTSEARCH(object):
         return
 
 
-def StateStart():
-
-    current_node=Node(State())
-    uctClass=UCTSEARCH(5,current_node)
-    current_node = uctClass.getCurrent_Node()
-
-    print("Num Children: %d"%len(current_node.children))
-    for i,c in enumerate(current_node.children):
-        print(i,c)
-    print("Best Child: %s"%current_node.state)
-
-
 def GameStart():
 
-    current_node = Node(GameState2(moves=[], board=Board(),turn=0, next_turn=0,test=True))
-    uctClass = UCTSEARCH(10,current_node)
+    current_node = Node(GameState2(moves=[], board=Board(),turn=0, next_turn="a"))
+    uctClass = UCTSEARCH(5,current_node)
     current_node = uctClass.getCurrent_Node()
 
-    print("Num Children: %d"%len(current_node.children))
+    mylogger.debug("Num Children: %d" , len(current_node.children))
     for i,c in enumerate(current_node.children):
-    	print(i,c)
-    print("Best Child: %s"%current_node.state)
-    print("--------------------------------")
+    	mylogger.debug(i,c)
+    mylogger.debug("Best Child: %s" , current_node.state)
+    mylogger.debug("--------------------------------")
+
+    G = current_node.getGraph()
+    nx.draw_networkx(G)
+    plt.show()
+
 
 def GameStartS0():
 
@@ -214,18 +192,22 @@ def GameStartS0():
     uctClass = UCTSEARCH(100,current_node)
     current_node = uctClass.getCurrent_Node()
 
-    print("Num Children: %d"%len(current_node.children))
+    #logger = get_module_logger(__name__)
+
+    mylogger.debug("Num Children: %d" , len(current_node.children))
     for i,c in enumerate(current_node.children):
-    	print(i,c)
-    print("Best Child: %s"%current_node.state)
-    print("--------------------------------")
+        mylogger.debug("%d, %s", i,c)
+    mylogger.debug("Best Child: %s" , current_node.state)
+    mylogger.debug("--------------------------------")
 
-
+    G = current_node.getGraph()
+    nx.draw_networkx(G)
+    plt.show()
 
 def main():
 
-    GameStartS0()
-    #StateStart()
+    #GameStartS0()
+    GameStart()
 
 if __name__ == "__main__":
     main()

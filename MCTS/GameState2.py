@@ -2,18 +2,15 @@
 import random
 import math
 import hashlib
-import logging
 import argparse
 import numpy as np
 import copy
 
 from Board import Board
 
+from ATARI.MCTS import get_module_logger
 
-from logging import getLogger, StreamHandler, DEBUG
-from logging import Formatter
-import logging
-
+mylogger = get_module_logger(__name__)
 
 class GameState2():
 
@@ -35,23 +32,21 @@ class GameState2():
         self.check = check
         self.opposit_predict_win = None
 
-        self.log = getLogger("root")
-
         self.next_board = Board()
 
         # check available space when creating Node
         self.initial_space = len( self.board.isfilled() )
-        print("initialize <GameState2>, board remaiing space --> %s Next turn:%s" % (self.board.isfilled(), self.next_turn) )
-        print("initial piece move", self.moves)
-        print("initial piece location", self.board.board)
+        mylogger.debug("initialize <GameState2>, board remaiing space --> %s Next turn:%s" % (self.board.isfilled(), self.next_turn) )
+        mylogger.debug("initial piece move", self.moves)
+        mylogger.debug("initial piece location", self.board.board)
 
     def first_turn(self):
         self.first_turn = np.random.choice([0,1])
         if self.first_turn:
-            print("** Human first..")
+            mylogger.debug("** Human first..")
             self.next_turn = 0
         else:
-            print("* AI first..")
+            mylogger.debug("* AI first..")
             self.next_turn = 1
 
 
@@ -65,7 +60,7 @@ class GameState2():
 
             check_board.update(s,piece)
             if check_board.isWin(piece):
-                print(" ** check !! **")
+                mylogger.debug(" ** check !! **")
                 return True
 
         return False
@@ -84,14 +79,14 @@ class GameState2():
             temp_board.update(s,ai_piece)
             opposit_board.update(s,hu_piece)
 
-            #print("temp_board ..",temp_board.board)
+            #mylogger.debug("temp_board ..",temp_board.board)
 
             if temp_board.isWin(ai_piece):
-                print("%d is winning move for ai. (available)" % s)
+                mylogger.debug("%d is winning move for ai. (available)" % s)
                 self.opposit_predict_win = True
                 return s
             if opposit_board.isWin(hu_piece):
-                print("%d is winning move for human. (available)" % s)
+                mylogger.debug("%d is winning move for human. (available)" % s)
                 self.opposit_predict_win = True
                 return s
 
@@ -122,11 +117,11 @@ class GameState2():
         turn = self.next_board.board_turn()
 
         if turn % 2 == 0:
-            print("AI turn...%d on board. remaining space %d" % (move,9-turn))
+            mylogger.debug("AI turn...%d on board. remaining space %d" % (move,9-turn))
             self.next_board.update(move,self.PIECE[0])
             self.next_turn = 0
         elif turn % 2 == 1:
-            print("Human turn...%d on board. remaining space %d" % (move,9-turn))
+            mylogger.debug("Human turn...%d on board. remaining space %d" % (move,9-turn))
             self.next_board.update(move,self.PIECE[1])
             self.next_turn = 1
 
@@ -147,16 +142,16 @@ class GameState2():
 
         if self.next_turn == "a": # AI
             self.next_board.update(move,self.PIECE[0])
-            print("AI turn...%d on board. remaining space %d" % (move,remaining_sp))
+            mylogger.debug("AI turn...%d on board. remaining space %d" % (move,remaining_sp))
 
         elif self.next_turn == "h": # Human
             self.next_board.update(move,self.PIECE[1])
-            print("Human turn...%d on board. remaining space %d" % (move,remaining_sp))
+            mylogger.debug("Human turn...%d on board. remaining space %d" % (move,remaining_sp))
 
         check = self.check_play(self.next_board)
         next_turn = self.switchTurn() # update next_turn..
 
-        print("* build new GameState2.. *")
+        mylogger.debug("* build new GameState2.. *")
         next=GameState2(moves=self.moves+[ move ], board= self.next_board,turn=(self.turn +1), next_turn = next_turn, check=check)
         return next
 
@@ -165,14 +160,14 @@ class GameState2():
         ai_piece = self.PIECE[0]
         hu_piece = self.PIECE[1]
         if self.board.isWin(ai_piece):
-            print("AI WIN !")
+            mylogger.debug("AI WIN !")
             return True
 
         if self.board.isWin(hu_piece):
-            print("Human WIN !")
+            mylogger.debug("Human WIN !")
             return True
 
-        #print("Draw - NO WINNER !")
+        #mylogger.debug("Draw - NO WINNER !")
         return False
 
     def terminal(self):

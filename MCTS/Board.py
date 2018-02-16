@@ -2,7 +2,6 @@
 import random
 import math
 import hashlib
-import logging
 import argparse
 import numpy as np
 

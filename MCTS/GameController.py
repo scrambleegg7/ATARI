@@ -3,10 +3,11 @@ import numpy as np
 import math
 import logging
 import hashlib
+import matplotlib.pyplot as plt
 
 from node2 import Node
 
-from tictactoe_uct import UCTSEARCH
+from uctSearch import UCTSEARCH
 from GameState2 import GameState2
 from Board import Board
 
@@ -113,6 +114,8 @@ class GameController(object):
         self.num_moves = 10
         self.moves = []
 
+
+
     def getBoard(self):
 
         return self.board
@@ -142,41 +145,49 @@ class GameController(object):
 
         if isWin(self.board,self.aiPlayer.piece):
             print("AI WIN....")
-            return True
+            return 1
         elif isWin(self.board,self.huPlayer.piece):
             print("Human WIN....")
-            return True
+            return -1
         elif self.turn == NUM_TURNS:
-            return True
+            return 0
         else:
             #print("sorry no winner from terminal..")
-            return False
+            return 0
 
     def aiPlayerAction(self):
 
         board_array = self.board
         myBoard = Board(board=board_array)
 
-        #current_node = Node(GameState2(moves=self.moves, board=myBoard, turn=self.turn, next_turn=0,test=True))
         current_node = Node(GameState2(moves=self.moves, board=myBoard,turn=self.turn, next_turn="a"))
 
         for l in range(9 - self.turn):
-            uctClass = UCTSEARCH(100/(l+1),current_node)
+            uctClass = UCTSEARCH(500/(l+1),current_node)
             current_node = uctClass.getCurrent_Node()
 
-            print("Num Children: %d"%len(current_node.children))
-            for i,c in enumerate(current_node.children):
-            	print(i,c)
-            print("Best Child: %s"%current_node.state)
-            print("--------------------------------")
+            #print("Num Children: %d"%len(current_node.children))
+            #for i,c in enumerate(current_node.children):
+            #	print(i,c)
+            #print("Best Child: %s"%current_node.state)
+            #print("--------------------------------")
 
             best_state = current_node.state
             move = best_state.moves[ self.turn ]
 
+        self.turn += 1
         self.moves.append(move)
         piece = self.aiPlayer.piece
         self.makeMove(move,piece)
 
+        # show board....
+        #print(self)
+
+        if isWin(self.board,piece):
+            print("AI WIN....")
+            return 1
+
+        return 0
 
     def huPlayerAction(self): # from human player with manual entry with number...
         move = self.huPlayer.randomPlay(self.board)
@@ -184,12 +195,56 @@ class GameController(object):
         piece = self.huPlayer.piece
         self.makeMove(move,piece)
 
+        self.turn += 1
+
+        # print Board
+        #print(self)
+
+        if isWin(self.board,piece):
+            print("Human WIN....")
+            return -1
+
+        return 0
+
 
     def huPlayerActionManual(self): # from human player with manual entry with number...
         move = self.huPlayer.getPlayerMove(self.board)
         self.moves.append(move)
         piece = self.huPlayer.piece
+
         self.makeMove(move,piece)
+
+        self.turn += 1
+
+        # print board
+        #print(self)
+
+        if isWin(self.board,self.huPlayer.piece):
+            print("Human WIN....")
+            return -1
+
+        return 0
+
+    def next_state_ai_vs_hurandom(self):
+
+        if self.aiPlayer.first:
+            if self.aiPlayerAction() != 0:
+                return 1
+
+            #if self.huPlayerActionManual() != 0:
+            if self.huPlayerAction() != 0:
+                return -1
+
+        else:
+            #if self.huPlayerActionManual() != 0:
+            if self.huPlayerAction() != 0:
+                return -1
+
+            if self.aiPlayerAction() != 0:
+                return 1
+
+        return 0
+
 
     def next_state_manual(self):
 
@@ -197,16 +252,16 @@ class GameController(object):
             self.aiPlayerAction()
             self.turn += 1
             print(self)
-            print(self.board)
-            print(self.moves)
+            #print(self.board)
+            #print(self.moves)
             if self.terminal():
                 return True
 
             self.huPlayerActionManual()
             self.turn += 1
             print(self)
-            print(self.board)
-            print(self.moves)
+            #print(self.board)
+            #print(self.moves)
             if self.terminal():
                 return True
 
@@ -214,16 +269,16 @@ class GameController(object):
             self.huPlayerActionManual()
             self.turn += 1
             print(self)
-            print(self.board)
-            print(self.moves)
+            #print(self.board)
+            #print(self.moves)
             if self.terminal():
                 return True
 
             self.aiPlayerAction()
             self.turn += 1
             print(self)
-            print(self.board)
-            print(self.moves)
+            #print(self.board)
+            #print(self.moves)
             if self.terminal():
                 return True
 
@@ -236,30 +291,56 @@ class GameController(object):
         if c == 0: # aiPlayer is first
             self.aiPlayer = aiPlayer(first=True)
             self.huPlayer = huPlayer(first=False)
-            print("* AI first turn.....")
+            #print("* AI first turn.....")
             self.next_turn = 1
         else:
             self.aiPlayer = aiPlayer(first=False)
             self.huPlayer = huPlayer(first=True)
-            print("** human first turn.....")
+            #print("** human first turn.....")
             self.next_turn = 0
 
 
 def main():
 
+    ai_win = []
+    hu_win = []
 
-    gs = GameController()
-    gs.firstTurn() # decide which turn place piece first
+    ai_win_rate = []
+    hu_win_rate = []
 
-    for l in range(NUM_TURNS-1):
-        logging.info("turn : %d", l)
-        win_lose = gs.next_state_manual()
+    for i in range(100):
 
-        if win_lose:
-            break
+        if i % 100 == 0:
+            print("Game Loop counter..",i)
 
-        #current_node=UCTSEARCH(num_sims/(l+1),current_node)
+        gs = GameController(board = np.array([' '] * 10), next_turn=0)
+        gs.firstTurn() # decide which turn place piece first
 
+        for l in range(NUM_TURNS-1):
+            logging.info("turn : %d", l)
+            win_lose = gs.next_state_ai_vs_hurandom()
+
+            if win_lose == 1:
+                ai_win.append(win_lose)
+                break
+            elif win_lose == -1:
+                hu_win.append(abs(win_lose))
+                break
+
+            elif gs.turn == NUM_TURNS-1:
+                break
+
+        total_ai = np.sum(ai_win)
+        total_hu = np.sum(hu_win)
+
+        aiw_r = total_ai / float(i+1)
+        huw_r = total_hu / float(i+1)
+
+        ai_win_rate.append(aiw_r)
+        hu_win_rate.append(huw_r)
+
+    plt.plot( range(len(ai_win_rate)),ai_win_rate)
+    plt.show()
 
 if __name__ == "__main__":
     main()
